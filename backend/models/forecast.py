@@ -5,7 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 from typing import Optional
 
-from backend.models.base import Base, TimestampMixin
+from models.base import Base, TimestampMixin
 
 
 class ForecastPrediction(Base, TimestampMixin):

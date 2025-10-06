@@ -4,9 +4,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from backend.config import settings
-from backend.database import init_db
-from backend.api import lines, traffic, schedules, geo, webhooks
+from config import settings
+from database import init_db
+from api import lines, traffic, schedules, geo, webhooks
 
 
 @asynccontextmanager
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "backend.main:app",
+        "main:app",
         host=settings.host,
         port=settings.port,
         reload=settings.reload,

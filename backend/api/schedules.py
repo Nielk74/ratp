@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException, Path
 from typing import Optional
 
-from backend.services.ratp_client import RatpClient
+from services.ratp_client import RatpClient
 
 router = APIRouter()
 ratp_client = RatpClient()

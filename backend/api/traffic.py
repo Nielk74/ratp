@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 
-from backend.services.ratp_client import RatpClient, RateLimitExceeded
+from services.ratp_client import RatpClient, RateLimitExceeded
 
 router = APIRouter()
 ratp_client = RatpClient()

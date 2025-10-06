@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 import asyncio
 from functools import wraps
 
-from backend.config import settings
-from backend.services.cache_service import CacheService
+from config import settings
+from services.cache_service import CacheService
 
 
 class RateLimitExceeded(Exception):
@@ -48,11 +48,11 @@ class RatpClient:
         self,
         url: str,
         headers: Optional[Dict] = None,
-        max_retries: int = 3,
-        timeout: int = 10
+        max_retries: int = 2,
+        timeout: int = 5
     ) -> Dict[str, Any]:
         """Fetch data from API with retry logic."""
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(timeout)) as client:
             for attempt in range(max_retries):
                 try:
                     response = await client.get(url, headers=headers or {})
@@ -71,7 +71,7 @@ class RatpClient:
 
     async def get_traffic_info(self, line_code: Optional[str] = None) -> Dict[str, Any]:
         """
-        Get traffic information for all lines or a specific line.
+        Get traffic information for all lines or a specific line using PRIM API.
 
         Args:
             line_code: Optional line code to filter (e.g., "1", "A", "T3a")
@@ -86,14 +86,60 @@ class RatpClient:
         if cached:
             return cached
 
-        try:
-            # Try community API first (simpler, no auth required)
-            url = f"{self.community_url}/traffic"
-            if line_code:
-                # Community API doesn't support filtering, so we'll fetch all and filter
-                pass
+        # Try PRIM API (official Île-de-France Mobilités API)
+        if self.prim_key:
+            try:
+                self._check_rate_limit("traffic")
 
-            data = await self._fetch_with_retry(url)
+                # PRIM API endpoint for traffic info
+                url = f"{self.prim_url}/v2/navitia/line_reports"
+                headers = {
+                    "apiKey": self.prim_key,
+                    "Accept": "application/json"
+                }
+
+                # Add line filter if specified
+                params = {"count": 100}
+
+                data = await self._fetch_with_retry(url, headers=headers, timeout=10)
+                self._prim_traffic_count += 1
+
+                # Transform PRIM response to our format
+                result = {
+                    "status": "ok",
+                    "message": "Traffic data from PRIM API",
+                    "source": "prim_api",
+                    "timestamp": datetime.now().isoformat(),
+                    "data": data
+                }
+
+                # Filter by line if specified
+                if line_code and "line_reports" in data:
+                    result["data"]["line_reports"] = [
+                        report for report in data.get("line_reports", [])
+                        if line_code in report.get("line", {}).get("code", "")
+                    ]
+
+                # Cache the result
+                await self.cache.set(cache_key, result, ttl=settings.cache_ttl_traffic)
+                return result
+
+            except RateLimitExceeded as e:
+                return {
+                    "status": "rate_limited",
+                    "message": "PRIM API rate limit exceeded. Please try again later.",
+                    "error": str(e),
+                    "source": "prim_api",
+                    "timestamp": datetime.now().isoformat()
+                }
+            except Exception as e:
+                # Log PRIM API error but continue to try community API
+                print(f"PRIM API error: {str(e)}")
+
+        # Try community API as fallback
+        try:
+            url = f"{self.community_url}/traffic"
+            data = await self._fetch_with_retry(url, timeout=5)
 
             # Filter by line if specified
             if line_code and isinstance(data, dict) and "result" in data:
@@ -108,12 +154,27 @@ class RatpClient:
             return data
 
         except Exception as e:
-            # Fallback or error handling
-            return {
+            # Return informative message about API key requirement
+            message = "Unable to fetch real-time traffic data."
+            if not self.prim_key:
+                message += " Please configure PRIM_API_KEY environment variable. Get your free API key at: https://prim.iledefrance-mobilites.fr"
+            else:
+                message += " Both PRIM and community APIs are currently unavailable."
+
+            fallback = {
+                "status": "unavailable",
+                "message": message,
                 "error": str(e),
-                "source": "community_api",
-                "timestamp": datetime.now().isoformat()
+                "source": "no_api_available",
+                "timestamp": datetime.now().isoformat(),
+                "help": {
+                    "prim_api_configured": bool(self.prim_key),
+                    "instructions": "To enable real-time traffic data, get a free API key from https://prim.iledefrance-mobilites.fr and set PRIM_API_KEY environment variable."
+                }
             }
+            # Cache fallback for short time
+            await self.cache.set(cache_key, fallback, ttl=30)
+            return fallback
 
     async def get_schedules(
         self,

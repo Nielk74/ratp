@@ -5,8 +5,8 @@ from pydantic import BaseModel, HttpUrl
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.database import get_db_session
-from backend.services.discord_service import DiscordService
+from database import get_db_session
+from services.discord_service import DiscordService
 
 router = APIRouter()
 discord_service = DiscordService()

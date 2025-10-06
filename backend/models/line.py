@@ -4,11 +4,11 @@ from sqlalchemy import String, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, TYPE_CHECKING
 
-from backend.models.base import Base, TimestampMixin
+from models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from backend.models.station import LineStation
-    from backend.models.traffic import TrafficEvent
+    from models.station import LineStation
+    from models.traffic import TrafficEvent
 
 
 class Line(Base, TimestampMixin):

@@ -4,7 +4,7 @@ import httpx
 from typing import Dict, Optional
 from datetime import datetime, timedelta
 
-from backend.config import settings
+from config import settings
 
 
 class DiscordService:

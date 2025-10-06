@@ -5,11 +5,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING
 
-from backend.models.base import Base, TimestampMixin
+from models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from backend.models.line import Line
-    from backend.models.station import Station
+    from models.line import Line
+    from models.station import Station
 
 
 class ScheduleHistory(Base, TimestampMixin):

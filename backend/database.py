@@ -5,8 +5,8 @@ from sqlalchemy.pool import NullPool
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from backend.config import settings
-from backend.models.base import Base
+from config import settings
+from models.base import Base
 
 
 # Create async engine
