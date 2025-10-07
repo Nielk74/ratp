@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import asyncio
 from ..config import settings
 from .cache_service import CacheService
+from .station_data import STATION_FALLBACKS
 
 
 class RateLimitExceeded(Exception):
@@ -352,6 +353,14 @@ class RatpClient:
         api_segment = type_to_api_segment.get(transport_type)
         stations_data = await self.get_stations(api_segment, line_code) if api_segment else None
         stations = stations_data.get("result", {}).get("stations", []) if isinstance(stations_data, dict) else []
+
+        # Fallback to static hubs if community API fails
+        if not stations:
+            stations = (
+                STATION_FALLBACKS
+                .get(transport_type, {})
+                .get(code_normalised, [])
+            )
 
         payload = {
             "line": line_info,

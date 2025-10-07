@@ -6,6 +6,7 @@ from .geo_service import GeoService
 from .cache_service import CacheService
 from .line_service import LineService, LineNotFoundError
 from .traffic_status import TrafficStatusService
+from .station_data import STATION_FALLBACKS
 
 __all__ = [
     "RatpClient",
@@ -15,4 +16,5 @@ __all__ = [
     "LineService",
     "LineNotFoundError",
     "TrafficStatusService",
+    "STATION_FALLBACKS",
 ]
