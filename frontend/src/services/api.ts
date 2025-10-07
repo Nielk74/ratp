@@ -11,10 +11,6 @@ const DEFAULT_BACKEND_PORT = process.env.NEXT_PUBLIC_BACKEND_PORT || "8000";
 const FALLBACK_HOST = process.env.NEXT_PUBLIC_BACKEND_HOST;
 
 function resolveBaseUrl(): string {
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-
   if (typeof window !== "undefined") {
     try {
       const url = new URL(window.location.href);
