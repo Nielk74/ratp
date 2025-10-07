@@ -248,15 +248,27 @@ export function getLineStatus(
   traffic: TrafficData | null,
 ): LineStatusInfo {
   const code = buildLineStatusKey(line);
-  return (
-    statusMap[code] ?? {
-      level: "unknown",
-      label: lineStatusLabel("unknown"),
-      message:
-        traffic?.status === "unavailable"
-          ? traffic.message
-          : "Live status unavailable",
-      source: "fallback",
-    }
-  );
+  const existing = statusMap[code];
+  if (existing) {
+    return existing;
+  }
+
+  if (traffic?.status === "ok" && traffic?.source === "prim_api") {
+    return {
+      level: "normal",
+      label: lineStatusLabel("normal"),
+      message: "No disruptions reported",
+      source: "prim",
+    };
+  }
+
+  return {
+    level: "unknown",
+    label: lineStatusLabel("unknown"),
+    message:
+      traffic?.status === "unavailable"
+        ? traffic.message
+        : "Live status unavailable",
+    source: "fallback",
+  };
 }

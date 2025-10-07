@@ -26,6 +26,14 @@ export function TrafficStatus({ traffic, lines }: TrafficStatusProps) {
     );
   }, [statusMap]);
 
+  const lastUpdated = useMemo(() => {
+    if (traffic?.timestamp) {
+      const parsed = new Date(traffic.timestamp);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+    return null;
+  }, [traffic?.timestamp]);
+
   if (!traffic || !hasLines) {
     return (
       <div className="bg-white rounded-lg shadow p-6">
@@ -44,7 +52,7 @@ export function TrafficStatus({ traffic, lines }: TrafficStatusProps) {
       <div className="p-6 border-b border-gray-200">
         <h2 className="text-2xl font-bold text-gray-900">Metro Lines Status</h2>
         <p className="text-sm text-gray-500 mt-1">
-          Last updated: {new Date().toLocaleTimeString()}
+          Last updated: {lastUpdated ? lastUpdated.toLocaleTimeString() : new Date().toLocaleTimeString()}
         </p>
       </div>
 

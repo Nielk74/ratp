@@ -46,6 +46,7 @@ class RatpClient:
         self,
         url: str,
         headers: Optional[Dict] = None,
+        params: Optional[Dict[str, Any]] = None,
         max_retries: int = 2,
         timeout: int = 5
     ) -> Dict[str, Any]:
@@ -53,7 +54,11 @@ class RatpClient:
         async with httpx.AsyncClient(timeout=httpx.Timeout(timeout)) as client:
             for attempt in range(max_retries):
                 try:
-                    response = await client.get(url, headers=headers or {})
+                    response = await client.get(
+                        url,
+                        headers=headers or {},
+                        params=params or {},
+                    )
                     response.raise_for_status()
                     return response.json()
                 except httpx.HTTPStatusError as e:
@@ -99,7 +104,16 @@ class RatpClient:
                 # Add line filter if specified
                 params = {"count": 100}
 
-                data = await self._fetch_with_retry(url, headers=headers, timeout=10)
+                params = {"count": 100}
+                if line_code:
+                    params["q"] = line_code
+
+                data = await self._fetch_with_retry(
+                    url,
+                    headers=headers,
+                    params=params,
+                    timeout=10,
+                )
                 self._prim_traffic_count += 1
 
                 # Transform PRIM response to our format

@@ -56,6 +56,7 @@ export interface TrafficData {
     [key: string]: unknown;
   };
   status?: string;
+  source?: string;
   message?: string;
   timestamp?: string;
   error?: string;
