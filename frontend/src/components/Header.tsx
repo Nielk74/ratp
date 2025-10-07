@@ -46,9 +46,19 @@ export function Header() {
             </a>
           </nav>
 
-          <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
-            <span className="text-sm text-gray-600">Live</span>
+          <div className="flex items-center space-x-4">
+            <a
+              href="http://xps:8000/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-700 hover:text-primary transition text-sm"
+            >
+              API Docs
+            </a>
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
+              <span className="text-sm text-gray-600">Live</span>
+            </div>
           </div>
         </div>
       </div>
