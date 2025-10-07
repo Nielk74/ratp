@@ -1,9 +1,10 @@
 """Webhook subscription model for Discord notifications."""
 
-from sqlalchemy import String, Integer, Boolean, DateTime, Text, ForeignKey, ARRAY
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import Base, TimestampMixin
 
@@ -24,20 +25,25 @@ class WebhookSubscription(Base, TimestampMixin):
         Integer,
         ForeignKey("lines.id", ondelete="CASCADE"),
         nullable=False,
-        index=True
+        index=True,
     )
 
     # SQLite doesn't support ARRAY, so we'll store as JSON string
     severity_filter: Mapped[Optional[str]] = mapped_column(
         Text,  # Will store JSON array as string
-        nullable=True
+        nullable=True,
     )
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
 
     last_triggered: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
-        nullable=True
+        nullable=True,
+    )
+
+    line: Mapped["Line"] = relationship(
+        "Line",
+        back_populates="webhook_subscriptions",
     )
 
     def __repr__(self) -> str:

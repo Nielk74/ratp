@@ -118,20 +118,30 @@ async def test_create_webhook_subscription(client: AsyncClient):
 
     response = await client.post("/api/webhooks", json=webhook_data)
 
-    assert response.status_code == 200
+    assert response.status_code == 201
     data = response.json()
-    assert "message" in data
+    assert data["line_code"] == "1"
+    assert data["webhook_url"] == webhook_data["webhook_url"]
+    assert data["severity_filter"] == ["high", "critical"]
 
 
 @pytest.mark.asyncio
 async def test_list_webhook_subscriptions(client: AsyncClient):
     """Test listing webhook subscriptions."""
+    await client.post("/api/webhooks", json={
+        "webhook_url": "https://discord.com/api/webhooks/123/abc",
+        "line_code": "1",
+        "severity_filter": ["high"]
+    })
+
     response = await client.get("/api/webhooks")
 
     assert response.status_code == 200
     data = response.json()
-    assert "subscriptions" in data
-    assert "count" in data
+    assert data["count"] == 1
+    assert len(data["subscriptions"]) == 1
+    assert data["subscriptions"][0]["line_code"] == "1"
+    assert data["subscriptions"][0]["severity_filter"] == ["high"]
 
 
 @pytest.mark.asyncio
@@ -148,7 +158,13 @@ async def test_test_webhook(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_delete_webhook_subscription(client: AsyncClient):
     """Test deleting a webhook subscription."""
-    response = await client.delete("/api/webhooks/1")
+    create_response = await client.post("/api/webhooks", json={
+        "webhook_url": "https://discord.com/api/webhooks/123/abc",
+        "line_code": "1"
+    })
+    subscription_id = create_response.json()["id"]
+
+    response = await client.delete(f"/api/webhooks/{subscription_id}")
 
     assert response.status_code == 200
     data = response.json()

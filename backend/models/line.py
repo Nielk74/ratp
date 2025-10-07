@@ -9,6 +9,7 @@ from models.base import Base, TimestampMixin
 if TYPE_CHECKING:
     from models.station import LineStation
     from models.traffic import TrafficEvent
+    from models.webhook import WebhookSubscription
 
 
 class Line(Base, TimestampMixin):
@@ -31,6 +32,12 @@ class Line(Base, TimestampMixin):
 
     traffic_events: Mapped[List["TrafficEvent"]] = relationship(
         "TrafficEvent",
+        back_populates="line",
+        cascade="all, delete-orphan"
+    )
+
+    webhook_subscriptions: Mapped[List["WebhookSubscription"]] = relationship(
+        "WebhookSubscription",
         back_populates="line",
         cascade="all, delete-orphan"
     )
