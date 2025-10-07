@@ -16,9 +16,13 @@ function resolveBaseUrl(): string {
   }
 
   if (typeof window !== "undefined") {
-    const url = new URL(window.location.href);
-    const host = FALLBACK_HOST || url.hostname;
-    return `${url.protocol}//${host}:${DEFAULT_BACKEND_PORT}`;
+    try {
+      const url = new URL(window.location.href);
+      const host = FALLBACK_HOST || url.hostname;
+      return `${url.protocol}//${host}:${DEFAULT_BACKEND_PORT}`;
+    } catch (error) {
+      console.error("Failed to resolve backend host from window.location", error);
+    }
   }
 
   const envHost = FALLBACK_HOST || "127.0.0.1";
