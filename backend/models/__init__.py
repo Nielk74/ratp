@@ -1,12 +1,12 @@
 """Database models for RATP Live Tracker."""
 
-from models.base import Base
-from models.line import Line
-from models.station import Station, LineStation
-from models.traffic import TrafficEvent
-from models.schedule import ScheduleHistory
-from models.webhook import WebhookSubscription
-from models.forecast import ForecastPrediction
+from .base import Base
+from .line import Line
+from .station import Station, LineStation
+from .traffic import TrafficEvent
+from .schedule import ScheduleHistory
+from .webhook import WebhookSubscription
+from .forecast import ForecastPrediction
 
 __all__ = [
     "Base",

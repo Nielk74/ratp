@@ -1,7 +1,8 @@
 """Tests for Discord webhook service."""
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
+
 from backend.services.discord_service import DiscordService
 
 
@@ -30,7 +31,7 @@ async def test_discord_send_alert_success(mock_post):
     # Mock successful response
     mock_response = AsyncMock()
     mock_response.status_code = 204
-    mock_response.raise_for_status = AsyncMock()
+    mock_response.raise_for_status = Mock()
     mock_post.return_value = mock_response
 
     service = DiscordService()
@@ -72,7 +73,7 @@ async def test_discord_send_alert_respects_rate_limit(mock_post):
     """Test that rate limiting prevents rapid consecutive sends."""
     mock_response = AsyncMock()
     mock_response.status_code = 204
-    mock_response.raise_for_status = AsyncMock()
+    mock_response.raise_for_status = Mock()
     mock_post.return_value = mock_response
 
     service = DiscordService()

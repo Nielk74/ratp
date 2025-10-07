@@ -4,10 +4,10 @@ from sqlalchemy import String, Integer, Numeric, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Optional, List, TYPE_CHECKING
 
-from models.base import Base, TimestampMixin
+from .base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from models.line import Line
+    from .line import Line
 
 
 class Station(Base, TimestampMixin):

@@ -3,13 +3,13 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 
-from services.ratp_client import RatpClient
+from ..services.ratp_client import RatpClient
 
 router = APIRouter()
 ratp_client = RatpClient()
 
 
-@router.get("/")
+@router.get("")
 async def get_lines(
     transport_type: Optional[str] = Query(
         None,

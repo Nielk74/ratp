@@ -1,7 +1,10 @@
 """Tests for RATP API client."""
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
+
+import httpx
+
 from backend.services.ratp_client import RatpClient, RateLimitExceeded
 
 
@@ -40,7 +43,7 @@ async def test_get_traffic_info(mock_get):
     # Mock API response
     mock_response = AsyncMock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {
+    mock_response.json = Mock(return_value={
         "result": {
             "metros": [
                 {
@@ -50,8 +53,8 @@ async def test_get_traffic_info(mock_get):
                 }
             ]
         }
-    }
-    mock_response.raise_for_status = AsyncMock()
+    })
+    mock_response.raise_for_status = Mock()
     mock_get.return_value = mock_response
 
     client = RatpClient()
@@ -67,14 +70,14 @@ async def test_get_schedules(mock_get):
     """Test getting schedule information."""
     mock_response = AsyncMock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {
+    mock_response.json = Mock(return_value={
         "result": {
             "schedules": [
                 {"message": "1 mn", "destination": "La Défense"}
             ]
         }
-    }
-    mock_response.raise_for_status = AsyncMock()
+    })
+    mock_response.raise_for_status = Mock()
     mock_get.return_value = mock_response
 
     client = RatpClient()
@@ -92,12 +95,16 @@ async def test_fetch_with_retry_on_failure(mock_get):
     """Test retry logic on API failures."""
     # First call fails, second succeeds
     mock_response_fail = AsyncMock()
-    mock_response_fail.raise_for_status.side_effect = Exception("Network error")
+    request = httpx.Request("GET", "https://test.com")
+    response = httpx.Response(500, request=request)
+    mock_response_fail.raise_for_status = Mock(
+        side_effect=httpx.HTTPStatusError("Network error", request=request, response=response)
+    )
 
     mock_response_success = AsyncMock()
     mock_response_success.status_code = 200
-    mock_response_success.json.return_value = {"data": "success"}
-    mock_response_success.raise_for_status = AsyncMock()
+    mock_response_success.json = Mock(return_value={"data": "success"})
+    mock_response_success.raise_for_status = Mock()
 
     mock_get.side_effect = [mock_response_fail, mock_response_success]
 
@@ -114,7 +121,11 @@ async def test_rate_limit_exceeded_handling(mock_get):
     """Test handling of 429 rate limit responses."""
     mock_response = AsyncMock()
     mock_response.status_code = 429
-    mock_response.raise_for_status.side_effect = Exception("Rate limit")
+    request = httpx.Request("GET", "https://test.com")
+    response = httpx.Response(429, request=request)
+    mock_response.raise_for_status = Mock(
+        side_effect=httpx.HTTPStatusError("Rate limit", request=request, response=response)
+    )
     mock_get.return_value = mock_response
 
     client = RatpClient()
@@ -129,14 +140,14 @@ async def test_get_stations(mock_get):
     """Test getting stations for a line."""
     mock_response = AsyncMock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {
+    mock_response.json = Mock(return_value={
         "result": {
             "stations": [
                 {"name": "Châtelet", "slug": "chatelet"}
             ]
         }
-    }
-    mock_response.raise_for_status = AsyncMock()
+    })
+    mock_response.raise_for_status = Mock()
     mock_get.return_value = mock_response
 
     client = RatpClient()

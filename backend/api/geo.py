@@ -3,8 +3,8 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 
-from services.geo_service import GeoService
-from services.ratp_client import RatpClient
+from ..services.geo_service import GeoService
+from ..services.ratp_client import RatpClient
 
 router = APIRouter()
 geo_service = GeoService()

@@ -4,12 +4,12 @@ from sqlalchemy import String, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, TYPE_CHECKING
 
-from models.base import Base, TimestampMixin
+from .base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from models.station import LineStation
-    from models.traffic import TrafficEvent
-    from models.webhook import WebhookSubscription
+    from .station import LineStation
+    from .traffic import TrafficEvent
+    from .webhook import WebhookSubscription
 
 
 class Line(Base, TimestampMixin):

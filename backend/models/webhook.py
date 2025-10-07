@@ -6,10 +6,10 @@ from typing import Optional, TYPE_CHECKING
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from models.base import Base, TimestampMixin
+from .base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from models.line import Line
+    from .line import Line
 
 
 class WebhookSubscription(Base, TimestampMixin):

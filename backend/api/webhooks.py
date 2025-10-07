@@ -8,12 +8,12 @@ from pydantic import BaseModel, HttpUrl
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database import get_db_session
-from models.line import Line
-from models.webhook import WebhookSubscription
-from services.discord_service import DiscordService
-from services.line_service import LineNotFoundError, LineService
-from services.ratp_client import RatpClient
+from ..database import get_db_session
+from ..models.line import Line
+from ..models.webhook import WebhookSubscription
+from ..services.discord_service import DiscordService
+from ..services.line_service import LineNotFoundError, LineService
+from ..services.ratp_client import RatpClient
 
 router = APIRouter()
 discord_service = DiscordService()
@@ -57,7 +57,7 @@ def _serialize_subscription(
     )
 
 
-@router.post("/", response_model=WebhookResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=WebhookResponse, status_code=status.HTTP_201_CREATED)
 async def create_webhook_subscription(
     webhook: WebhookCreate,
     db: AsyncSession = Depends(get_db_session)
@@ -99,7 +99,7 @@ async def create_webhook_subscription(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/", response_model=dict)
+@router.get("", response_model=dict)
 async def list_webhook_subscriptions(
     db: AsyncSession = Depends(get_db_session)
 ):

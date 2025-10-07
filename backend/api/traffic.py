@@ -3,13 +3,13 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 
-from services.ratp_client import RatpClient, RateLimitExceeded
+from ..services.ratp_client import RatpClient, RateLimitExceeded
 
 router = APIRouter()
 ratp_client = RatpClient()
 
 
-@router.get("/")
+@router.get("")
 async def get_traffic(
     line_code: Optional[str] = Query(
         None,

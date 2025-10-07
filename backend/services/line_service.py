@@ -6,8 +6,8 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.line import Line
-from services.ratp_client import RatpClient
+from ..models.line import Line
+from .ratp_client import RatpClient
 
 
 class LineNotFoundError(Exception):
