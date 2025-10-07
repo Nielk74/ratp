@@ -142,7 +142,7 @@ export default function WebhooksPage() {
               required
               value={selectedLine}
               onChange={(event) => setSelectedLine(event.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none"
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
               {sortedLines.map((line) => (
                 <option key={line.code} value={line.code}>
