@@ -111,6 +111,59 @@ class RatpClient:
                         raise
                     await asyncio.sleep(2 ** attempt)
 
+    async def _fetch_idfm_stations(
+        self,
+        transport_type: str,
+        line_code: str,
+    ) -> List[Dict[str, Any]]:
+        """Fetch station list from IDFM open data as fallback."""
+        mode_map = {
+            "metro": "Metro",
+            "rer": "RapidTransit",
+            "tram": "Tramway",
+            "transilien": "LocalTrain",
+            "bus": "Bus",
+        }
+
+        mode = mode_map.get(transport_type)
+        if not mode:
+            return []
+
+        params = {
+            "where": f"mode='{mode}' and shortname='{line_code.upper()}'",
+            "limit": 100,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=20) as client:
+                response = await client.get(
+                    "https://data.iledefrance-mobilites.fr/api/explore/v2.1/catalog/datasets/arrets-lignes/records",
+                    params=params,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                results = payload.get("results", [])
+                unique: Dict[str, Dict[str, Any]] = {}
+                for item in results:
+                    name = item.get("stop_name")
+                    if not name:
+                        continue
+                    if name in unique:
+                        continue
+                    unique[name] = {
+                        "name": name,
+                        "latitude": float(item["stop_lat"]) if item.get("stop_lat") else None,
+                        "longitude": float(item["stop_lon"]) if item.get("stop_lon") else None,
+                        "city": item.get("nom_commune"),
+                        "stop_id": item.get("stop_id"),
+                    }
+
+                return sorted(unique.values(), key=lambda item: item.get("name") or "")
+        except Exception:
+            return []
+
+        return []
+
     async def get_traffic_info(self, line_code: Optional[str] = None) -> Dict[str, Any]:
         """
         Get traffic information for all lines or a specific line using PRIM API.
@@ -355,6 +408,9 @@ class RatpClient:
         stations = stations_data.get("result", {}).get("stations", []) if isinstance(stations_data, dict) else []
 
         # Fallback to static hubs if community API fails
+        if not stations:
+            stations = await self._fetch_idfm_stations(transport_type, line_code)
+
         if not stations:
             stations = (
                 STATION_FALLBACKS
