@@ -1,27 +1,33 @@
 "use client";
 
-import { Line, TrafficData } from "@/types";
+import type { Line, LineStatusInfo } from "@/types";
+import { sourceLabel } from "@/utils/traffic";
 
 interface LineCardProps {
   line: Line;
-  traffic: TrafficData;
+  status: LineStatusInfo;
 }
 
-export function LineCard({ line, traffic }: LineCardProps) {
-  // Determine status from traffic data
-  // This is simplified - real implementation would parse traffic.result
-  const status = "normal"; // normal, disrupted, closed
-  const statusColors = {
-    normal: "bg-success",
-    disrupted: "bg-warning",
-    closed: "bg-error",
-  };
+const STATUS_DOT_COLORS: Record<LineStatusInfo["level"], string> = {
+  normal: "bg-success",
+  warning: "bg-warning",
+  disrupted: "bg-error",
+  closed: "bg-error",
+  unknown: "bg-gray-300",
+};
 
-  const statusText = {
-    normal: "Normal",
-    disrupted: "Disrupted",
-    closed: "Closed",
-  };
+const STATUS_TEXT_COLORS: Record<LineStatusInfo["level"], string> = {
+  normal: "text-success",
+  warning: "text-warning",
+  disrupted: "text-error",
+  closed: "text-error",
+  unknown: "text-gray-500",
+};
+
+export function LineCard({ line, status }: LineCardProps) {
+  const dotColor = STATUS_DOT_COLORS[status.level] ?? "bg-gray-300";
+  const textColor = STATUS_TEXT_COLORS[status.level] ?? "text-gray-500";
+  const showSource = status.source !== "fallback";
 
   return (
     <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
@@ -32,10 +38,7 @@ export function LineCard({ line, traffic }: LineCardProps) {
         >
           {line.code}
         </div>
-        <div
-          className={`${statusColors[status]} w-3 h-3 rounded-full`}
-          title={statusText[status]}
-        ></div>
+        <div className={`${dotColor} w-3 h-3 rounded-full`} title={status.label}></div>
       </div>
 
       <h3 className="font-semibold text-gray-900 text-sm mb-1">
@@ -43,18 +46,18 @@ export function LineCard({ line, traffic }: LineCardProps) {
       </h3>
       <p className="text-xs text-gray-600 line-clamp-2">{line.name}</p>
 
-      <div className="mt-3 pt-3 border-t border-gray-100">
-        <span
-          className={`text-xs font-medium ${
-            status === "normal"
-              ? "text-success"
-              : status === "disrupted"
-              ? "text-warning"
-              : "text-error"
-          }`}
-        >
-          {statusText[status]}
-        </span>
+      <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
+        <span className={`text-xs font-medium ${textColor}`}>{status.label}</span>
+
+        {status.message && (
+          <p className="text-xs text-gray-600 line-clamp-3">{status.message}</p>
+        )}
+
+        {showSource && (
+          <p className="text-[10px] uppercase tracking-wide text-gray-400">
+            {sourceLabel(status.source)}
+          </p>
+        )}
       </div>
     </div>
   );

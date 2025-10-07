@@ -12,12 +12,64 @@ export interface Station {
   lines?: string[];
 }
 
+export interface CommunityTrafficLine {
+  line: string;
+  slug: string;
+  title: string;
+  message?: string;
+}
+
+export interface PrimTrafficLineReport {
+  line?: {
+    code?: string;
+    name?: string;
+    id?: string;
+  };
+  status?: {
+    severity?: string;
+    message?: string;
+    short_message?: string;
+    description?: string;
+    effect?: string;
+    status?: string;
+  };
+  disruption?: {
+    severity?: string;
+    description?: string;
+  };
+  impacts?: Array<{
+    severity?: string;
+    description?: string;
+  }>;
+}
+
 export interface TrafficData {
   result?: {
-    [key: string]: any;
+    metros?: CommunityTrafficLine[];
+    rers?: CommunityTrafficLine[];
+    tramways?: CommunityTrafficLine[];
+    buses?: CommunityTrafficLine[];
+    [key: string]: CommunityTrafficLine[] | undefined;
   };
+  data?: {
+    line_reports?: PrimTrafficLineReport[];
+    [key: string]: unknown;
+  };
+  status?: string;
+  message?: string;
   timestamp?: string;
   error?: string;
+}
+
+export type LineStatusLevel = "normal" | "warning" | "disrupted" | "closed" | "unknown";
+
+export type LineStatusSource = "prim" | "community" | "fallback";
+
+export interface LineStatusInfo {
+  level: LineStatusLevel;
+  label: string;
+  message?: string;
+  source: LineStatusSource;
 }
 
 export interface Schedule {
