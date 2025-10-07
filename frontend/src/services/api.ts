@@ -1,6 +1,7 @@
 import axios from "axios";
 import type {
   Line,
+  LineDetails,
   NormalizedTrafficStatus,
   NearestStationResult,
   Schedule,
@@ -52,6 +53,14 @@ export const apiClient = {
     const { data } = await api.get(
       `/api/lines/${transportType}/${lineCode}/stations`
     );
+    return data;
+  },
+
+  async getLineDetails(
+    transportType: string,
+    lineCode: string
+  ): Promise<LineDetails> {
+    const { data } = await api.get(`/api/lines/${transportType}/${lineCode}`);
     return data;
   },
 

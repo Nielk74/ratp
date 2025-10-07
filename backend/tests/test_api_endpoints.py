@@ -37,6 +37,9 @@ async def test_get_lines(client: AsyncClient):
     assert "lines" in data
     assert "count" in data
     assert data["count"] > 0
+    # Ensure we have multiple transport types available
+    types = {line["type"] for line in data["lines"]}
+    assert {"metro", "rer", "tram", "transilien"}.issubset(types)
 
 
 @pytest.mark.asyncio
@@ -51,6 +54,17 @@ async def test_get_lines_filtered_by_type(client: AsyncClient):
     # All returned lines should be metro
     for line in data["lines"]:
         assert line["type"] == "metro"
+
+
+@pytest.mark.asyncio
+async def test_get_line_details(client: AsyncClient):
+    """Test fetching detailed information for a line."""
+    response = await client.get("/api/lines/metro/1")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["line"]["code"] == "1"
+    assert "stations" in data
 
 
 @pytest.mark.asyncio

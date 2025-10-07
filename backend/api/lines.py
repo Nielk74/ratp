@@ -13,13 +13,25 @@ ratp_client = RatpClient()
 async def get_lines(
     transport_type: Optional[str] = Query(
         None,
-        description="Filter by transport type (metro, rer, tram, bus)"
+        description="Filter by transport type (metro, rer, tram, transilien)"
     )
 ):
     """Get list of available RATP lines."""
     try:
         lines = await ratp_client.get_lines(transport_type)
         return {"lines": lines, "count": len(lines)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{transport_type}/{line_code}")
+async def get_line_details(transport_type: str, line_code: str):
+    """Get detailed information for a line including stations."""
+    try:
+        details = await ratp_client.get_line_details(transport_type, line_code)
+        return details
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

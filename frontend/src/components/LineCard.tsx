@@ -6,6 +6,8 @@ import { sourceLabel } from "@/utils/traffic";
 interface LineCardProps {
   line: Line;
   status: LineStatusInfo;
+  isActive?: boolean;
+  onSelect?: (line: Line) => void;
 }
 
 const STATUS_DOT_COLORS: Record<LineStatusInfo["level"], string> = {
@@ -24,13 +26,24 @@ const STATUS_TEXT_COLORS: Record<LineStatusInfo["level"], string> = {
   unknown: "text-gray-500",
 };
 
-export function LineCard({ line, status }: LineCardProps) {
+export function LineCard({ line, status, isActive = false, onSelect }: LineCardProps) {
   const dotColor = STATUS_DOT_COLORS[status.level] ?? "bg-gray-300";
   const textColor = STATUS_TEXT_COLORS[status.level] ?? "text-gray-500";
   const showSource = status.source !== "fallback";
+  const handleClick = () => {
+    if (onSelect) {
+      onSelect(line);
+    }
+  };
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+    <button
+      type="button"
+      onClick={handleClick}
+      className={`w-full text-left border rounded-lg p-4 bg-white transition ${
+        isActive ? "border-primary shadow-lg ring-2 ring-primary/20" : "border-gray-200 hover:shadow-md"
+      }`}
+    >
       <div className="flex items-center justify-between mb-3">
         <div
           className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg"
@@ -59,6 +72,6 @@ export function LineCard({ line, status }: LineCardProps) {
           </p>
         )}
       </div>
-    </div>
+    </button>
   );
 }

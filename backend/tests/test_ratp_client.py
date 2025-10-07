@@ -22,6 +22,28 @@ async def test_get_lines():
 
 
 @pytest.mark.asyncio
+async def test_get_lines_transilien():
+    """Ensure SNCF lines are available."""
+    client = RatpClient()
+
+    lines = await client.get_lines("transilien")
+
+    assert any(line["code"] == "L" for line in lines)
+
+
+@pytest.mark.asyncio
+@patch.object(RatpClient, "get_stations", return_value={"result": {"stations": []}})
+async def test_get_line_details(mock_stations):
+    """Test retrieving detailed line information."""
+    client = RatpClient()
+
+    details = await client.get_line_details("metro", "1")
+
+    assert details["line"]["code"] == "1"
+    mock_stations.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_get_lines_uses_cache():
     """Test that repeated calls use cache."""
     client = RatpClient()

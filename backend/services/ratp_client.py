@@ -22,6 +22,44 @@ class RatpClient:
         self.community_url = settings.community_api_url
         self.cache = CacheService()
 
+        self._line_catalog: List[Dict[str, Any]] = [
+            # Metro lines
+            {"code": "1", "name": "La Défense – Château de Vincennes", "type": "metro", "color": "#FFCD00"},
+            {"code": "2", "name": "Porte Dauphine – Nation", "type": "metro", "color": "#003CA6"},
+            {"code": "3", "name": "Pont de Levallois – Gallieni", "type": "metro", "color": "#837902"},
+            {"code": "4", "name": "Porte de Clignancourt – Bagneux", "type": "metro", "color": "#BB4A9B"},
+            {"code": "5", "name": "Bobigny – Place d'Italie", "type": "metro", "color": "#FF7E2E"},
+            {"code": "6", "name": "Charles de Gaulle – Nation", "type": "metro", "color": "#6ECA97"},
+            {"code": "7", "name": "La Courneuve – Villejuif / Mairie d'Ivry", "type": "metro", "color": "#FA9ABA"},
+            {"code": "8", "name": "Balard – Créteil", "type": "metro", "color": "#E19BDF"},
+            {"code": "9", "name": "Pont de Sèvres – Mairie de Montreuil", "type": "metro", "color": "#B6BD00"},
+            {"code": "10", "name": "Boulogne – Gare d'Austerlitz", "type": "metro", "color": "#C9910D"},
+            {"code": "11", "name": "Châtelet – Rosny-Bois-Perrier", "type": "metro", "color": "#704B1C"},
+            {"code": "12", "name": "Front Populaire – Mairie d'Issy", "type": "metro", "color": "#007852"},
+            {"code": "13", "name": "Saint-Denis / Gennevilliers – Châtillon", "type": "metro", "color": "#6EC4E8"},
+            {"code": "14", "name": "Saint-Denis Pleyel – Orly", "type": "metro", "color": "#62259D"},
+            # RER lines
+            {"code": "A", "name": "RER A", "type": "rer", "color": "#F9423A"},
+            {"code": "B", "name": "RER B", "type": "rer", "color": "#4A95C5"},
+            {"code": "C", "name": "RER C", "type": "rer", "color": "#FCD946"},
+            {"code": "D", "name": "RER D", "type": "rer", "color": "#00A651"},
+            {"code": "E", "name": "RER E", "type": "rer", "color": "#C7007D"},
+            # Tram lines
+            {"code": "T1", "name": "Noisy-le-Sec – Asnières – Gennevilliers", "type": "tram", "color": "#8DC63F"},
+            {"code": "T2", "name": "Pont de Bezons – Porte de Versailles", "type": "tram", "color": "#0055A4"},
+            {"code": "T3a", "name": "Pont du Garigliano – Porte de Vincennes", "type": "tram", "color": "#FF5A00"},
+            {"code": "T3b", "name": "Porte de Vincennes – Porte d'Asnières", "type": "tram", "color": "#FF5A00"},
+            {"code": "T7", "name": "Villejuif – Athis-Mons", "type": "tram", "color": "#00AEEF"},
+            {"code": "T13", "name": "Saint-Cyr – Saint-Germain-en-Laye", "type": "tram", "color": "#6B2C91"},
+            # Transilien / SNCF
+            {"code": "H", "name": "Transilien H", "type": "transilien", "color": "#7ACCC8"},
+            {"code": "J", "name": "Transilien J", "type": "transilien", "color": "#0075C9"},
+            {"code": "L", "name": "Transilien L", "type": "transilien", "color": "#A2006D"},
+            {"code": "N", "name": "Transilien N", "type": "transilien", "color": "#00A86B"},
+            {"code": "P", "name": "Transilien P", "type": "transilien", "color": "#F1921D"},
+            {"code": "U", "name": "Transilien U", "type": "transilien", "color": "#5C2D91"},
+        ]
+
         # Rate limiting counters
         self._prim_traffic_count = 0
         self._prim_departures_count = 0
@@ -279,25 +317,48 @@ class RatpClient:
         if cached:
             return cached
 
-        # Hardcoded Paris metro lines for now (can be extended)
-        metro_lines = [
-            {"code": "1", "name": "La Défense - Château de Vincennes", "type": "metro", "color": "#FFCD00"},
-            {"code": "2", "name": "Porte Dauphine - Nation", "type": "metro", "color": "#003CA6"},
-            {"code": "3", "name": "Pont de Levallois - Gallieni", "type": "metro", "color": "#837902"},
-            {"code": "4", "name": "Porte de Clignancourt - Mairie de Montrouge", "type": "metro", "color": "#BB4A9B"},
-            {"code": "5", "name": "Bobigny - Place d'Italie", "type": "metro", "color": "#FF7E2E"},
-            {"code": "6", "name": "Charles de Gaulle - Nation", "type": "metro", "color": "#6ECA97"},
-            {"code": "7", "name": "La Courneuve - Villejuif/Mairie d'Ivry", "type": "metro", "color": "#FA9ABA"},
-            {"code": "8", "name": "Balard - Créteil", "type": "metro", "color": "#E19BDF"},
-            {"code": "9", "name": "Pont de Sèvres - Mairie de Montreuil", "type": "metro", "color": "#B6BD00"},
-            {"code": "10", "name": "Boulogne - Gare d'Austerlitz", "type": "metro", "color": "#C9910D"},
-            {"code": "11", "name": "Châtelet - Mairie des Lilas", "type": "metro", "color": "#704B1C"},
-            {"code": "12", "name": "Front Populaire - Mairie d'Issy", "type": "metro", "color": "#007852"},
-            {"code": "13", "name": "Saint-Denis - Châtillon", "type": "metro", "color": "#6EC4E8"},
-            {"code": "14", "name": "Saint-Lazare - Olympiades", "type": "metro", "color": "#62259D"},
-        ]
+        if transport_type:
+            filtered = [line for line in self._line_catalog if line["type"] == transport_type]
+        else:
+            filtered = list(self._line_catalog)
 
-        result = metro_lines if not transport_type or transport_type == "metro" else []
-        await self.cache.set(cache_key, result, ttl=86400)  # Cache for 1 day
+        await self.cache.set(cache_key, filtered, ttl=86400)
 
-        return result
+        return filtered
+
+    async def get_line_details(self, transport_type: str, line_code: str) -> Dict[str, Any]:
+        """Return rich line details including station list."""
+        cache_key = f"line_details:{transport_type}:{line_code}"
+        cached = await self.cache.get(cache_key)
+        if cached:
+            return cached
+
+        code_normalised = line_code.strip().upper()
+        line_info = next(
+            (line for line in self._line_catalog if line["type"] == transport_type and line["code"].upper() == code_normalised),
+            None,
+        )
+
+        if not line_info:
+            raise ValueError(f"Unknown line {transport_type}:{line_code}")
+
+        type_to_api_segment = {
+            "metro": "metros",
+            "rer": "rers",
+            "tram": "tramways",
+            "bus": "buses",
+        }
+
+        api_segment = type_to_api_segment.get(transport_type)
+        stations_data = await self.get_stations(api_segment, line_code) if api_segment else None
+        stations = stations_data.get("result", {}).get("stations", []) if isinstance(stations_data, dict) else []
+
+        payload = {
+            "line": line_info,
+            "stations": stations,
+            "stations_count": len(stations),
+            "source": stations_data.get("source") if isinstance(stations_data, dict) else "unknown",
+        }
+
+        await self.cache.set(cache_key, payload, ttl=3600)
+        return payload

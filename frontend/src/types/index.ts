@@ -1,7 +1,7 @@
 export interface Line {
   code: string;
   name: string;
-  type: "metro" | "rer" | "tram" | "bus";
+  type: "metro" | "rer" | "tram" | "transilien";
   color?: string;
 }
 
@@ -72,6 +72,22 @@ export interface NormalizedTrafficStatus {
     level: LineStatusLevel;
     message: string;
   };
+}
+
+export interface LineStation {
+  name?: string;
+  slug?: string;
+  latitude?: number;
+  longitude?: number;
+  city?: string;
+  [key: string]: unknown;
+}
+
+export interface LineDetails {
+  line: Line;
+  stations: LineStation[];
+  stations_count: number;
+  source?: string;
 }
 
 export interface Schedule {

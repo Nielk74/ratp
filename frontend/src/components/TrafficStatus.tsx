@@ -14,9 +14,11 @@ import {
 interface TrafficStatusProps {
   traffic: NormalizedTrafficStatus | null;
   lines: Line[];
+  onSelectLine?: (line: Line) => void;
+  selectedLineCode?: string | null;
 }
 
-export function TrafficStatus({ traffic, lines }: TrafficStatusProps) {
+export function TrafficStatus({ traffic, lines, onSelectLine, selectedLineCode }: TrafficStatusProps) {
   const statusMap = useMemo(() => buildLineStatusMap(traffic), [traffic]);
   const hasLines = lines.length > 0;
 
@@ -73,6 +75,8 @@ export function TrafficStatus({ traffic, lines }: TrafficStatusProps) {
                 key={buildLineStatusKey(line)}
                 line={line}
                 status={status}
+                isActive={selectedLineCode === line.code}
+                onSelect={onSelectLine}
               />
             );
           })}
