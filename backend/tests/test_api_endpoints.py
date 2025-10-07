@@ -2,6 +2,7 @@
 
 import pytest
 from httpx import AsyncClient
+from unittest.mock import patch
 
 
 @pytest.mark.asyncio
@@ -178,3 +179,31 @@ async def test_cors_headers(client: AsyncClient):
 
     # Should have CORS headers
     assert response.status_code in [200, 405]  # OPTIONS may not be explicitly handled
+
+
+@pytest.mark.asyncio
+@patch("backend.api.traffic.ratp_client.get_traffic_info")
+async def test_get_traffic_status_endpoint(mock_get, client: AsyncClient):
+    """Test normalised traffic status endpoint."""
+    mock_get.return_value = {
+        "status": "ok",
+        "source": "prim_api",
+        "timestamp": "2025-10-07T00:00:00",
+        "data": {
+            "line_reports": [
+                {
+                    "line": {"code": "1"},
+                    "status": {"severity": "information", "message": "Delay"},
+                }
+            ]
+        },
+    }
+
+    response = await client.get("/api/traffic/status")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert len(data["lines"]) == 1
+    assert data["lines"][0]["line_code"] == "1"
+    assert data["lines"][0]["source"] == "prim"

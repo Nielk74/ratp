@@ -1,20 +1,40 @@
 import axios from "axios";
 import type {
   Line,
-  TrafficData,
+  NormalizedTrafficStatus,
   NearestStationResult,
   Schedule,
   WebhookSubscription,
 } from "@/types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const DEFAULT_BACKEND_PORT = process.env.NEXT_PUBLIC_BACKEND_PORT || "8000";
+const FALLBACK_HOST = process.env.NEXT_PUBLIC_BACKEND_HOST;
+
+function resolveBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+
+  if (typeof window !== "undefined") {
+    const url = new URL(window.location.href);
+    const host = FALLBACK_HOST || url.hostname;
+    return `${url.protocol}//${host}:${DEFAULT_BACKEND_PORT}`;
+  }
+
+  const envHost = FALLBACK_HOST || "127.0.0.1";
+  return `http://${envHost}:${DEFAULT_BACKEND_PORT}`;
+}
 
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: resolveBaseUrl(),
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",
   },
+});
+api.interceptors.request.use((config) => {
+  config.baseURL = resolveBaseUrl();
+  return config;
 });
 
 export const apiClient = {
@@ -36,9 +56,9 @@ export const apiClient = {
   },
 
   // Traffic
-  async getTraffic(lineCode?: string): Promise<TrafficData> {
+  async getTraffic(lineCode?: string): Promise<NormalizedTrafficStatus> {
     const params = lineCode ? { line_code: lineCode } : {};
-    const { data } = await api.get("/api/traffic", { params });
+    const { data } = await api.get("/api/traffic/status", { params });
     return data;
   },
 

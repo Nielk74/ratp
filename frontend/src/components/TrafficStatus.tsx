@@ -1,6 +1,6 @@
 "use client";
 
-import { Line, TrafficData } from "@/types";
+import { Line, NormalizedTrafficStatus } from "@/types";
 import { useMemo } from "react";
 
 import { LineCard } from "./LineCard";
@@ -12,7 +12,7 @@ import {
 } from "@/utils/traffic";
 
 interface TrafficStatusProps {
-  traffic: TrafficData | null;
+  traffic: NormalizedTrafficStatus | null;
   lines: Line[];
 }
 
@@ -20,11 +20,7 @@ export function TrafficStatus({ traffic, lines }: TrafficStatusProps) {
   const statusMap = useMemo(() => buildLineStatusMap(traffic), [traffic]);
   const hasLines = lines.length > 0;
 
-  const hasLiveData = useMemo(() => {
-    return Object.values(statusMap).some(
-      (status) => status.source !== "fallback",
-    );
-  }, [statusMap]);
+  const hasLiveData = !!(traffic && traffic.lines.length > 0);
 
   const lastUpdated = useMemo(() => {
     if (traffic?.timestamp) {
@@ -33,6 +29,13 @@ export function TrafficStatus({ traffic, lines }: TrafficStatusProps) {
     }
     return null;
   }, [traffic?.timestamp]);
+
+  const dataSourceLabel = useMemo(() => {
+    if (!traffic?.source) return undefined;
+    if (traffic.source === "prim_api") return sourceLabel("prim");
+    if (traffic.source === "community_api") return sourceLabel("community");
+    return undefined;
+  }, [traffic?.source]);
 
   if (!traffic || !hasLines) {
     return (
@@ -44,7 +47,7 @@ export function TrafficStatus({ traffic, lines }: TrafficStatusProps) {
   }
 
   const advisoryMessage = !hasLiveData
-    ? traffic.message ?? "Live data unavailable. Please configure PRIM API access."
+    ? traffic?.default.message ?? "Live data unavailable."
     : undefined;
 
   return (
@@ -74,9 +77,9 @@ export function TrafficStatus({ traffic, lines }: TrafficStatusProps) {
             );
           })}
         </div>
-        {hasLiveData && (
+        {dataSourceLabel && (
           <p className="mt-6 text-xs text-gray-500">
-            Data source: {sourceLabel("prim")} (fallback to community API when available)
+            Data source: {dataSourceLabel}
           </p>
         )}
       </div>

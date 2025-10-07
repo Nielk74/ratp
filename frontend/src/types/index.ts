@@ -43,25 +43,6 @@ export interface PrimTrafficLineReport {
   }>;
 }
 
-export interface TrafficData {
-  result?: {
-    metros?: CommunityTrafficLine[];
-    rers?: CommunityTrafficLine[];
-    tramways?: CommunityTrafficLine[];
-    buses?: CommunityTrafficLine[];
-    [key: string]: CommunityTrafficLine[] | undefined;
-  };
-  data?: {
-    line_reports?: PrimTrafficLineReport[];
-    [key: string]: unknown;
-  };
-  status?: string;
-  source?: string;
-  message?: string;
-  timestamp?: string;
-  error?: string;
-}
-
 export type LineStatusLevel = "normal" | "warning" | "disrupted" | "closed" | "unknown";
 
 export type LineStatusSource = "prim" | "community" | "fallback";
@@ -71,6 +52,26 @@ export interface LineStatusInfo {
   label: string;
   message?: string;
   source: LineStatusSource;
+  line_code?: string;
+  details?: unknown;
+}
+
+export interface NormalizedTrafficStatus {
+  generated_at: string;
+  status?: string;
+  source?: string;
+  timestamp?: string;
+  lines: Array<{
+    line_code: string;
+    level: LineStatusLevel;
+    message?: string;
+    source: LineStatusSource;
+    details?: unknown;
+  }>;
+  default: {
+    level: LineStatusLevel;
+    message: string;
+  };
 }
 
 export interface Schedule {

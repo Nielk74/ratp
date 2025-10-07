@@ -60,7 +60,8 @@ async def test_get_traffic_info(mock_get):
     client = RatpClient()
     traffic = await client.get_traffic_info()
 
-    assert "result" in traffic
+    assert "data" in traffic
+    assert "result" in traffic["data"]
     assert mock_get.called
 
 

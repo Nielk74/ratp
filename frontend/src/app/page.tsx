@@ -5,11 +5,11 @@ import { Header } from "@/components/Header";
 import { TrafficStatus } from "@/components/TrafficStatus";
 import { NearestStations } from "@/components/NearestStations";
 import { apiClient } from "@/services/api";
-import type { Line, TrafficData } from "@/types";
+import type { Line, NormalizedTrafficStatus } from "@/types";
 
 export default function Home() {
   const [lines, setLines] = useState<Line[]>([]);
-  const [traffic, setTraffic] = useState<TrafficData | null>(null);
+  const [traffic, setTraffic] = useState<NormalizedTrafficStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
