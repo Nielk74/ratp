@@ -463,6 +463,16 @@ Examples:
 6. ⏳ Initialize database schema
 7. ⏳ Implement RATP API client
 
+### 🚆 Real-Time Train Position Plan (Research 2025-10-08)
+- **Live feeds status:** No public endpoints currently return train positions; community API remains offline. PRIM Navitia/SIRI/GTFS-RT URLs respond with `no Route matched` for the current key, confirming access is restricted.
+- **Required action:** Contact Île-de-France Mobilités via the PRIM portal and request activation for real-time feeds (SIRI StopMonitoring, GTFS-RT vehicle_positions/trip_updates, or Navitia coverage stop_schedules). Specify the lines/modes needed (Metro, RER, Transilien, Tram).
+- **Backend plan once enabled:**
+  * Create a `VehiclePositionService` that polls the authorised feed, decodes vehicle locations, and stores snapshots (vehicle_id, line_code, lat/lon, next_stop, timestamp) for later analytics.
+  * Expose REST endpoints such as `GET /api/lines/{type}/{code}/vehicles` providing live positions, inferred ETAs, and headways.
+  * Persist historical snapshots in a dedicated table to power forecasting and reliability metrics.
+- **Fallback approach:** If GTFS-RT is still unavailable after the request, use SIRI StopMonitoring arrivals to infer train progress between stations. This still requires SIRI access; without it we will not fabricate positions.
+- **Next checkpoint:** Re-test feed URLs once IDFM confirms activation; resume backend ingestion and UI work immediately afterwards.
+
 ### This Week
 - Complete backend foundation
 - Create basic API endpoints
