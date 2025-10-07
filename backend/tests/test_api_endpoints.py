@@ -109,7 +109,8 @@ async def test_get_nearest_stations_invalid_params(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_create_webhook_subscription(client: AsyncClient):
+@patch("backend.api.webhooks.discord_service.send_alert", return_value=True)
+async def test_create_webhook_subscription(mock_send, client: AsyncClient):
     """Test creating a webhook subscription."""
     webhook_data = {
         "webhook_url": "https://discord.com/api/webhooks/123/abc",
@@ -124,10 +125,12 @@ async def test_create_webhook_subscription(client: AsyncClient):
     assert data["line_code"] == "1"
     assert data["webhook_url"] == webhook_data["webhook_url"]
     assert data["severity_filter"] == ["high", "critical"]
+    mock_send.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_list_webhook_subscriptions(client: AsyncClient):
+@patch("backend.api.webhooks.discord_service.send_alert", return_value=True)
+async def test_list_webhook_subscriptions(mock_send, client: AsyncClient):
     """Test listing webhook subscriptions."""
     await client.post("/api/webhooks", json={
         "webhook_url": "https://discord.com/api/webhooks/123/abc",
@@ -143,6 +146,7 @@ async def test_list_webhook_subscriptions(client: AsyncClient):
     assert len(data["subscriptions"]) == 1
     assert data["subscriptions"][0]["line_code"] == "1"
     assert data["subscriptions"][0]["severity_filter"] == ["high"]
+    mock_send.assert_called()
 
 
 @pytest.mark.asyncio
@@ -157,7 +161,8 @@ async def test_test_webhook(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_delete_webhook_subscription(client: AsyncClient):
+@patch("backend.api.webhooks.discord_service.send_alert", return_value=True)
+async def test_delete_webhook_subscription(mock_send, client: AsyncClient):
     """Test deleting a webhook subscription."""
     create_response = await client.post("/api/webhooks", json={
         "webhook_url": "https://discord.com/api/webhooks/123/abc",
@@ -170,6 +175,7 @@ async def test_delete_webhook_subscription(client: AsyncClient):
     assert response.status_code == 200
     data = response.json()
     assert "message" in data
+    mock_send.assert_called_once()
 
 
 @pytest.mark.asyncio

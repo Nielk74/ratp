@@ -95,7 +95,7 @@ export const apiClient = {
     webhookUrl: string,
     lineCode: string,
     severityFilter?: string[]
-  ): Promise<any> {
+  ): Promise<WebhookSubscription> {
     const { data } = await api.post("/api/webhooks", {
       webhook_url: webhookUrl,
       line_code: lineCode,

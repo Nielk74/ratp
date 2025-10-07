@@ -89,6 +89,7 @@ export interface WebhookSubscription {
   id: number;
   webhook_url: string;
   line_code: string;
+  line_name?: string;
   severity_filter?: string[];
   is_active: boolean;
 }

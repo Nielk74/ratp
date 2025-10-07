@@ -89,6 +89,22 @@ async def create_webhook_subscription(
         await db.refresh(subscription)
         await db.refresh(subscription, attribute_names=["line"])
 
+        severity_display = ", ".join(webhook.severity_filter or ["all severities"])
+        sent = await discord_service.send_alert(
+            webhook_url=str(webhook.webhook_url),
+            line_name=line.line_name,
+            event_type="subscription",
+            severity="low",
+            title="Subscription Confirmed",
+            description=f"You will now receive alerts for line {line.line_code} ({line.line_name}).\nSeverity filter: {severity_display}",
+        )
+
+        if not sent:
+            raise HTTPException(
+                status_code=502,
+                detail="Subscription saved but failed to send confirmation message.",
+            )
+
         return _serialize_subscription(subscription, subscription.line)
 
     except LineNotFoundError as exc:

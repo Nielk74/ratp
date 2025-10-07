@@ -47,7 +47,14 @@ class Settings:
     rate_limit_prim_departures_per_day: int = int(os.getenv("RATE_LIMIT_PRIM_DEPARTURES_PER_DAY", "1000"))
 
     # CORS
-    cors_origins: List[str] = ["http://localhost:3000", "http://localhost:8000"]
+    cors_origins: List[str] = [
+        origin.strip()
+        for origin in os.getenv(
+            "CORS_ALLOW_ORIGINS",
+            "http://localhost:3000,http://localhost:8000,http://xps:3100",
+        ).split(",")
+        if origin.strip()
+    ]
     cors_allow_credentials: bool = True
 
     # Logging
