@@ -1,7 +1,14 @@
 """Application configuration management."""
 
 import os
+from pathlib import Path
 from typing import List
+
+from dotenv import load_dotenv
+
+# Load environment variables from project-level .env if available
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
 
 
 class Settings:
