@@ -1,14 +1,14 @@
 # RATP Real-Time Traffic API Research Report
 
-**Date**: October 7, 2025
-**Objective**: Find working real-time traffic/line status APIs for Paris public transport
-**Trigger**: User complaint that fallback traffic response is "not acceptable"
+**Date**: October 8, 2025
+**Objective**: Catalogue usable real-time data sources for Paris public transport (traffic, stations, vehicle positions)
+**Trigger**: Need for accurate traffic data, station catalogues, and upcoming train position features
 
 ---
 
 ## Executive Summary
 
-After extensive research and testing, **only the PRIM API (Île-de-France Mobilités)** provides working real-time traffic data. The community RATP API is completely down, and the official RATP Open Data portal only offers historical datasets.
+After extensive research and testing, **only the PRIM API (Île-de-France Mobilités)** provides working real-time traffic data. The community RATP API remains down, while Île-de-France Mobilités open data offers reliable station catalogues but no live vehicle feeds.
 
 ### Recommendations
 
@@ -82,10 +82,10 @@ $ curl -s "https://data.ratp.fr/api/explore/v2.1/catalog/datasets?limit=100"
    - Locations, lines, correspondences
    - Updated regularly
 
-4. **NO REAL-TIME TRAFFIC STATUS** ❌
-   - No datasets for line incidents
-   - No real-time disruption info
-   - No "traffic status" or "perturbations" datasets found
+4. **Station Catalogue** ✅
+   - Dataset `arrets-lignes` lists stop names, coordinates, operator, and mode
+   - Query example: `https://data.iledefrance-mobilites.fr/api/explore/v2.1/catalog/datasets/arrets-lignes/records?where=mode='Metro'%20and%20shortname='1'`
+   - Provides multiple records per stop (different entrances); deduplication required by `stop_name`
 
 #### Search Results
 
@@ -103,7 +103,7 @@ $ curl -s "https://data.ratp.fr/api/explore/v2.1/catalog/datasets?limit=100" \
 - `qualite-de-lair-*` - Air quality (real-time, but not traffic status)
 - `commerces-de-proximite-agrees-ratp` - RATP-approved shops
 
-**Verdict**: ⚠️ Good for historical data and station info, but **NO real-time traffic/line status**
+**Verdict**: ⚠️ Good for historical data and station info, but **no live incidents or vehicle positions**
 
 ---
 
@@ -210,7 +210,41 @@ curl -H "apiKey: YOUR_KEY" \
 
 ---
 
-### 4. Other APIs Investigated
+### 4. IDFM Open Data - Station Catalogue ✅ SUCCESS
+
+- **Dataset**: `arrets-lignes`
+- **Operators Covered**: RATP, SNCF, private bus operators
+- **Usage**: We derive station lists per line when the legacy community API is offline
+- **Caveats**: Multiple rows per physical station (one per entrance). We deduplicate by `stop_name`.
+
+Example query:
+
+```
+https://data.iledefrance-mobilites.fr/api/explore/v2.1/catalog/datasets/arrets-lignes/records?where=mode='Metro' and shortname='1'
+```
+
+Returns ~50 records for Metro line 1, which we collapse to ~25 unique station names.
+
+### 5. Real-Time Train Positions ❌ NOT YET AVAILABLE
+
+- **Attempted Feeds**: PRIM Navitia coverage (`/coverage/fr-idf/...`), SIRI StopMonitoring, GTFS-RT `vehicle_positions`
+- **Current Response**: `no Route matched with those values` / `unknown type: coverage` / 404 for GTFS-RT paths
+- **Reason**: IDFM must explicitly authorise these feeds per account
+
+#### Next Steps
+
+1. Contact Île-de-France Mobilités via the PRIM portal and request activation for:
+   - SIRI `StopMonitoring`
+   - GTFS-RT `vehicle_positions` / `trip_updates`
+   - Navitia coverage endpoints (`stop_schedules`, `vehicle_positions`)
+2. Once approved, integrate a `VehiclePositionService` to poll the feed, store snapshots, and expose `/api/lines/{type}/{code}/vehicles`.
+3. Persist snapshots for forecasting and reliability analytics.
+
+> Until the official feeds are enabled we **will not fabricate** real train positions. The frontend currently shows simulated markers purely as placeholders.
+
+---
+
+### 6. Other APIs Investigated
 
 #### data.gouv.fr
 - **URL**: https://www.data.gouv.fr/datasets/horaires-en-temps-reel-du-reseau-de-transport-ratp/
@@ -376,9 +410,9 @@ The community RATP API (`api-ratp.pierre-grimaud.fr`) is **completely unreachabl
 
 The **PRIM API** from Île-de-France Mobilités is the **only working solution** for real-time traffic data. It's official, free, reliable, and well-documented. Users must register for a free API key to access it.
 
-**Status**: ✅ Solution implemented
-**Next Step**: User needs to get PRIM API key (5-minute process)
-**Documentation**: See `PRIM_API_SETUP.md`
+**Status**: ✅ Traffic + station data implemented; 🚧 train positions awaiting feed activation
+**Next Step**: Request IDFM real-time vehicle feed activation via PRIM portal
+**Documentation**: See `PRIM_API_SETUP.md` and `plan.md` (Real-Time Train Position Plan)
 
 ---
 

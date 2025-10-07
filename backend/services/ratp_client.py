@@ -4,6 +4,7 @@ import httpx
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 import asyncio
+import math
 from ..config import settings
 from .cache_service import CacheService
 from .station_data import STATION_FALLBACKS
@@ -418,12 +419,89 @@ class RatpClient:
                 .get(code_normalised, [])
             )
 
+        trains = self._simulate_trains(line_info, stations)
+
         payload = {
             "line": line_info,
             "stations": stations,
             "stations_count": len(stations),
             "source": stations_data.get("source") if isinstance(stations_data, dict) else "unknown",
+            "trains": trains,
         }
 
         await self.cache.set(cache_key, payload, ttl=3600)
         return payload
+
+    def _simulate_trains(
+        self,
+        line_info: Dict[str, Any],
+        stations: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """Generate synthetic train positions along the line based on station coordinates."""
+        if len(stations) < 2:
+            return []
+
+        # Filter stations with coordinates
+        coords: List[Dict[str, Any]] = [
+            station for station in stations if station.get("latitude") and station.get("longitude")
+        ]
+        if len(coords) < 2:
+            return []
+
+        headway_seconds = 180  # 3 minutes between trains
+        dwell_seconds = 90     # dwell at terminus
+        segment_time = 90      # travel time per segment
+        total_segments = len(coords) - 1
+        trip_duration = total_segments * segment_time
+        cycle_duration = trip_duration + dwell_seconds
+        trains_per_direction = max(2, math.ceil(trip_duration / headway_seconds))
+
+        now = datetime.utcnow()
+        seconds_since_midnight = now.hour * 3600 + now.minute * 60 + now.second
+
+        trains: List[Dict[str, Any]] = []
+
+        def interpolate(start: Dict[str, Any], end: Dict[str, Any], progress: float) -> Dict[str, float]:
+            lat1 = float(start["latitude"])
+            lon1 = float(start["longitude"])
+            lat2 = float(end["latitude"])
+            lon2 = float(end["longitude"])
+            return {
+                "latitude": lat1 + (lat2 - lat1) * progress,
+                "longitude": lon1 + (lon2 - lon1) * progress,
+            }
+
+        def simulate_direction(
+            station_sequence: List[Dict[str, Any]],
+            direction: int,
+        ) -> None:
+            nonlocal trains
+            for idx in range(trains_per_direction):
+                offset = idx * headway_seconds
+                position_time = (seconds_since_midnight - offset) % cycle_duration
+                if position_time >= trip_duration:
+                    continue  # currently dwelling at terminus
+
+                segment_index = int(position_time // segment_time)
+                in_segment = (position_time % segment_time) / segment_time
+
+                start_station = station_sequence[segment_index]
+                end_station = station_sequence[segment_index + 1]
+
+                interpolated = interpolate(start_station, end_station, in_segment)
+
+                trains.append({
+                    "train_id": f"{line_info['code']}-{direction}-{idx}",
+                    "line_code": line_info["code"],
+                    "direction": direction,
+                    "position": interpolated,
+                    "from_station": start_station.get("name"),
+                    "to_station": end_station.get("name"),
+                    "progress": round(in_segment, 3),
+                    "updated_at": now.isoformat() + "Z",
+                })
+
+        simulate_direction(coords, 1)
+        simulate_direction(list(reversed(coords)), -1)
+
+        return trains

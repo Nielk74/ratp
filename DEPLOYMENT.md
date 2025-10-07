@@ -7,16 +7,14 @@
 
 ## 📊 Project Statistics
 
-### Code Statistics
-- **Total Files Created**: 52 files
-- **Backend Files**: 26 Python files
-- **Frontend Files**: 17 TypeScript/TSX files
-- **Tests**: 8 test files with 42 test cases
-- **Lines of Code**: ~4,500+ lines
+### Code Statistics *(as of 2025-10-08)*
+- **Backend**: FastAPI app + services (30+ Python modules)
+- **Frontend**: Next.js App Router with React components & pages
+- **Tests**: 48 automated checks across 8 modules
+- **Lines of Code**: ~6,000+ (backend + frontend)
 
 ### Git Statistics
-- **Total Commits**: 5
-- **Branches**: 1 (master)
+- **Default Branch**: `master`
 - **Repository**: https://github.com/Nielk74/ratp.git
 
 ---
@@ -24,50 +22,33 @@
 ## ✅ Completed Features
 
 ### Backend (FastAPI + SQLite)
-1. **API Endpoints**
-   - ✅ `/api/lines` - List all transport lines
-   - ✅ `/api/traffic` - Real-time traffic status
-   - ✅ `/api/schedules` - Live departure times
-   - ✅ `/api/geo/nearest` - Geolocation-based station finder
-   - ✅ `/api/webhooks` - Discord alert subscriptions
+1. **API Surface**
+   - `/api/lines` – network catalogue with optional type filter
+   - `/api/lines/{type}/{code}` – detailed line payload (stations + simulated trains)
+   - `/api/traffic/status` – normalised traffic severity map
+   - `/api/webhooks` – Discord subscription CRUD + confirmation pings
+   - `/api/geo/nearest` – geolocation search
+   - `/api/schedules` – legacy passthrough (currently awaiting external feed restoration)
 
 2. **Services**
-   - ✅ RATP API Client with rate limiting and caching
-   - ✅ Discord webhook notification service
-   - ✅ Geolocation service (Haversine distance)
-   - ✅ In-memory cache service with TTL
+   - PRIM Navitia client with caching & rate limiting
+   - IDFM open-data station enrichment and train simulation helper
+   - Discord webhook dispatcher and geolocation utilities
 
-3. **Database Models**
-   - ✅ Lines, Stations, LineStations
-   - ✅ TrafficEvents, ScheduleHistory
-   - ✅ WebhookSubscriptions, ForecastPredictions
-
-4. **Testing**
-   - ✅ 42 comprehensive tests
-   - ✅ Unit tests for all services
-   - ✅ Integration tests for API endpoints
-   - ✅ Database model tests
+3. **Testing**
+   - 48 automated tests (pytest) covering services, models, and endpoints
 
 ### Frontend (Next.js 14 + Tailwind CSS)
-1. **Pages**
-   - ✅ Dashboard with live traffic status
-   - ✅ Responsive layout with navigation
+1. **Pages & Views**
+   - Dashboard with network toggles and line detail panel
+   - Webhooks management page (create/list/delete)
 
 2. **Components**
-   - ✅ Header with navigation and live indicator
-   - ✅ TrafficStatus grid showing all metro lines
-   - ✅ LineCard with color-coded status
-   - ✅ NearestStations with geolocation feature
+   - Header, TrafficStatus grid, LineCard, LineDetailsPanel, NearestStations
 
-3. **Services**
-   - ✅ API client for backend communication
-   - ✅ TypeScript types for all data structures
-
-4. **Features**
-   - ✅ Auto-refresh every 2 minutes
-   - ✅ Mobile-first responsive design
-   - ✅ Real-time traffic status display
-   - ✅ Geolocation-based station finder
+3. **Features**
+   - Auto refresh (120s), responsive layouts, dynamic API host detection
+   - Client geolocation for station proximity
 
 ---
 
@@ -76,21 +57,20 @@
 ```
 ratp/
 ├── backend/
-│   ├── api/                    # REST API endpoints (5 routers)
-│   ├── models/                 # SQLAlchemy models (6 models)
-│   ├── services/               # Business logic (4 services)
-│   ├── tests/                  # Test suite (42 tests)
-│   ├── config.py              # Configuration management
-│   ├── database.py            # Database connection
-│   ├── main.py                # FastAPI application
-│   └── requirements.txt       # Python dependencies
+│   ├── api/                    # REST API routers (lines, traffic, schedules, geo, webhooks)
+│   ├── models/                 # SQLAlchemy models & mixins
+│   ├── services/               # External integrations & helpers
+│   ├── tests/                  # pytest suite (48 tests)
+│   ├── config.py               # Configuration management
+│   ├── database.py             # Async engine & session factory
+│   └── main.py                 # FastAPI application entrypoint
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── app/               # Next.js App Router
-│   │   ├── components/        # React components (4 components)
-│   │   ├── services/          # API client
-│   │   └── types/             # TypeScript definitions
+│   │   ├── app/               # Next.js App Router pages (dashboard, webhooks)
+│   │   ├── components/        # React UI components
+│   │   ├── services/          # Axios API client
+│   │   └── types/             # Shared TypeScript types
 │   ├── package.json           # Node dependencies
 │   ├── tsconfig.json          # TypeScript config
 │   └── tailwind.config.ts     # Tailwind config
@@ -183,12 +163,15 @@ APP_NAME="RATP Live Tracker"
 ENVIRONMENT="production"
 DATABASE_URL="sqlite+aiosqlite:///./ratp.db"
 PRIM_API_KEY=""  # Optional
-CORS_ORIGINS=["https://your-frontend.com"]
+# Allow multiple origins (comma-separated) e.g. http://localhost:3100,http://xps:3100
+CORS_ALLOW_ORIGINS="http://localhost:3000,http://localhost:3100"
 ```
 
 ### Frontend (.env.local)
 ```env
-NEXT_PUBLIC_API_URL=https://your-backend.com
+# Optional overrides when frontend host differs from backend
+NEXT_PUBLIC_BACKEND_HOST=xps
+NEXT_PUBLIC_BACKEND_PORT=8000
 ```
 
 ---
@@ -319,7 +302,7 @@ Once deployed, access interactive API documentation:
 3. ✅ **Frontend Dashboard**: Next.js with Tailwind CSS
 4. ✅ **Discord Webhooks**: Alert subscription system
 5. ✅ **Geolocation**: Nearest station finder
-6. ✅ **Testing**: 42 comprehensive tests
+6. ✅ **Testing**: 48 automated tests
 7. ✅ **Documentation**: Detailed README, plan.md, and this file
 8. ✅ **Git Workflow**: Clean commits with semantic messages
 

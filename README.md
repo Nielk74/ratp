@@ -11,29 +11,27 @@ Real-time monitoring system for Paris public transport (RATP) with live traffic 
 
 ## 🎯 Features
 
-### ✅ Backend (Fully Implemented)
-- **Real-time Traffic Data**: Fetch live traffic status and incidents from RATP APIs
-- **Schedule Information**: Get real-time departure times for any station
-- **Line Information**: Browse all metro, RER, tram, and bus lines
-- **Geolocation Service**: Find nearest stations based on coordinates
-- **Discord Webhooks**: Subscribe to alerts for specific lines
-- **Rate Limiting & Caching**: Intelligent API usage with in-memory cache
-- **REST API**: FastAPI backend with automatic documentation
-- **Test Suite**: 42 comprehensive tests covering all services and endpoints
+### ✅ Backend Highlights
+- **Live Traffic Status** sourced from PRIM Navitia (`line_reports`) with caching & rate-limit protection
+- **Multi-network Line Catalogue** (Metro, RER, Tram, Transilien) enriched with IDFM open-data stations
+- **Discord Webhooks** with confirmation messages and CRUD endpoints
+- **Geolocation & Utilities**: nearest-station search, in-memory cache, typed configuration
+- **Automated Tests**: 48 passes covering services, models, and REST contracts
 
-### ✅ Frontend (Fully Implemented)
-- **Live Dashboard**: Real-time traffic status for all metro lines
-- **Responsive Design**: Mobile-first UI built with Next.js 14 and Tailwind CSS
-- **Geolocation Feature**: Find nearest stations using your device location
-- **Auto-refresh**: Live data updates every 2 minutes
-- **Modern UI**: Clean, intuitive interface with line cards and status indicators
+> ℹ️ _True vehicle locations and mission ETAs need IDFM SIRI/GTFS-RT access. See the “Real-Time Train Position Plan” in `plan.md` for activation steps._
+
+### ✅ Frontend Highlights
+- **Network Toggles** to switch between Metro / RER / Tram / Transilien views
+- **Line Details Panel** with ordered station list and (currently) simulated train markers
+- **Discord Webhook Manager** page for creating, listing, and deleting alerts
+- **Nearest Stations Widget** with client-side geolocation
+- **Responsive Next.js 14 UI** refreshing data every two minutes
 
 ### 🚧 Coming Soon
-- **Interactive Map**: Leaflet.js map with stations and real-time data
-- **Traffic Forecasting**: ML-based predictions for delays and congestion
-- **Historical Data**: Track patterns and analyze past incidents
-- **Webhook Management UI**: Manage Discord subscriptions from the dashboard
-- **Mobile App**: Native iOS/Android applications
+- **Interactive Map** once official GTFS geometry & vehicle feeds are unlocked
+- **Live Train Positions & Forecasts** using SIRI StopMonitoring or GTFS-RT vehicle data (pending IDFM approval)
+- **Historical analytics** and reliability metrics based on stored vehicle snapshots
+- **Mobile companion apps** once the API surface settles
 
 ---
 
@@ -51,9 +49,10 @@ RATP Live Tracker
 └── plan.md          Project roadmap & architecture
 ```
 
-### APIs Used
-- **PRIM Île-de-France Mobilités**: Official API (20k requests/day)
-- **Community RATP API**: Fallback for simpler access
+### APIs & Data Sources
+- **PRIM Île-de-France Mobilités (Navitia)** – live traffic bulletins (`line_reports`)
+- **Île-de-France Mobilités Open Data** – station catalogue (`arrets-lignes`) and line references
+- **Community RATP API** – legacy fallback (currently offline; kept for compatibility)
 
 ---
 
@@ -113,7 +112,8 @@ npm install
 
 # Configure environment
 cp .env.local.example .env.local
-# Default API URL is http://localhost:8000
+# By default the client derives the API origin from the browser host.
+# Override with NEXT_PUBLIC_BACKEND_HOST / NEXT_PUBLIC_BACKEND_PORT if needed
 
 # Start development server
 npm run dev
@@ -139,23 +139,27 @@ npm run lint
 ## 📡 API Endpoints
 
 ### Lines
-- `GET /api/lines` - List all transport lines
-- `GET /api/lines/{type}/{code}/stations` - Get stations for a line
+- `GET /api/lines` – List all networks (metro, rer, tram, transilien)
+- `GET /api/lines?transport_type=metro` – Filter by transport type
+- `GET /api/lines/{type}/{code}` – Detailed line payload (stations + simulated trains)
+- `GET /api/lines/{type}/{code}/stations` – Raw station feed for integrations
 
 ### Traffic
-- `GET /api/traffic` - Get network-wide traffic status
-- `GET /api/traffic?line_code=1` - Filter by specific line
+- `GET /api/traffic/status` – Normalised traffic overview with severity labels
+- `GET /api/traffic` – Legacy pass-through payload (kept for compatibility)
+- `GET /api/traffic?line_code=1` – Filter traffic response by specific line
 
-### Schedules
-- `GET /api/schedules/{type}/{line}/{station}/{direction}` - Real-time departures
+### Schedules *(pending external feed reliability)*
+- `GET /api/schedules/{type}/{line}/{station}/{direction}` – Routed to community API; currently unavailable until the feed returns
 
 ### Geolocation
-- `GET /api/geo/nearest?lat=48.8566&lon=2.3522` - Find nearest stations
+- `GET /api/geo/nearest?lat=48.8566&lon=2.3522` – Find nearest stations to a coordinate
 
 ### Webhooks
-- `POST /api/webhooks` - Create Discord alert subscription
-- `GET /api/webhooks` - List active subscriptions
-- `POST /api/webhooks/test` - Send test notification
+- `POST /api/webhooks` – Create Discord alert subscription (sends confirmation message)
+- `GET /api/webhooks` – List active subscriptions
+- `DELETE /api/webhooks/{id}` – Remove a subscription
+- `POST /api/webhooks/test` – Send test notification
 
 ---
 
@@ -179,33 +183,20 @@ pytest backend/tests/test_ratp_client.py
 ```
 ratp/
 ├── backend/
-│   ├── api/
-│   │   ├── lines.py         # Line endpoints
-│   │   ├── traffic.py       # Traffic endpoints
-│   │   ├── schedules.py     # Schedule endpoints
-│   │   ├── geo.py           # Geolocation endpoints
-│   │   └── webhooks.py      # Webhook management
-│   ├── models/
-│   │   ├── line.py          # Line model
-│   │   ├── station.py       # Station model
-│   │   ├── traffic.py       # Traffic event model
-│   │   ├── schedule.py      # Schedule history model
-│   │   ├── webhook.py       # Webhook subscription model
-│   │   └── forecast.py      # Forecast prediction model
-│   ├── services/
-│   │   ├── ratp_client.py   # RATP API client
-│   │   ├── cache_service.py # Caching layer
-│   │   ├── discord_service.py # Discord notifications
-│   │   └── geo_service.py   # Geolocation calculations
-│   ├── config.py            # Configuration management
-│   ├── database.py          # Database connection
-│   ├── main.py              # FastAPI app
-│   └── requirements.txt     # Python dependencies
-├── frontend/                # (Coming soon)
-├── docs/
-├── plan.md                  # Architecture & roadmap
-├── README.md                # This file
-└── .gitignore
+│   ├── api/             # FastAPI routers (lines, traffic, schedules, geo, webhooks)
+│   ├── services/        # Integrations (PRIM, IDFM open data, Discord, cache)
+│   ├── models/          # SQLAlchemy models & mixins
+│   ├── tests/           # pytest suite (48 tests)
+│   └── main.py          # Application entry point
+├── frontend/
+│   ├── src/
+│   │   ├── app/         # Dashboard & webhooks pages (Next.js App Router)
+│   │   ├── components/  # Header, TrafficStatus, LineDetailsPanel, ...
+│   │   ├── services/    # Axios client with dynamic host detection
+│   │   └── types/       # Shared TypeScript definitions
+├── plan.md              # Architecture & real-time roadmap
+├── DEPLOYMENT.md        # Deployment & environment guide
+└── README.md            # Project overview
 ```
 
 ---
@@ -227,8 +218,8 @@ PORT=8000
 # Database
 DATABASE_URL="sqlite+aiosqlite:///./ratp.db"
 
-# RATP APIs
-PRIM_API_KEY=""  # Optional, register at prim.iledefrance-mobilites.fr
+# RATP / IDFM APIs
+PRIM_API_KEY=""  # Required for PRIM Navitia traffic feed
 COMMUNITY_API_URL="https://api-ratp.pierre-grimaud.fr/v4"
 
 # Caching
@@ -239,6 +230,9 @@ CACHE_TTL_STATIONS=86400   # 24 hours
 # Discord
 DISCORD_WEBHOOK_ENABLED=True
 DISCORD_RATE_LIMIT_SECONDS=60
+
+# CORS
+CORS_ALLOW_ORIGINS="http://localhost:3000,http://localhost:3100"
 ```
 
 ---
@@ -250,20 +244,21 @@ See [plan.md](plan.md) for detailed roadmap.
 ### Phase 1: Backend Foundation ✅ (COMPLETED)
 - [x] FastAPI setup
 - [x] Database models (SQLite)
-- [x] RATP API client with rate limiting
-- [x] REST endpoints (lines, traffic, schedules, geo, webhooks)
+- [x] PRIM Navitia client with rate limiting
+- [x] REST endpoints (lines, traffic, schedules*, geo, webhooks)
 - [x] Discord webhooks service
 - [x] Geolocation service
-- [x] Comprehensive test suite (42 tests)
+- [x] Comprehensive test suite (48 tests)
 
 ### Phase 2: Frontend Foundation ✅ (COMPLETED)
 - [x] Next.js 14 application
-- [x] Real-time dashboard
-- [x] Tailwind CSS styling
-- [x] Live traffic status component
+- [x] Network filters and line detail panel
+- [x] Webhook management UI
+- [x] Tailwind CSS styling & responsive design
 - [x] Geolocation nearest stations
 - [x] API client service
-- [x] Responsive mobile design
+
+> *Schedule endpoints remain dependent on the legacy community API; SIRI access is required for reliable live departures.*
 
 ### Phase 3: Advanced Features (Next)
 - [ ] Interactive map with Leaflet

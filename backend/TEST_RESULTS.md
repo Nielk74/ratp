@@ -1,7 +1,7 @@
 # RATP Live Tracker - Endpoint Test Results
 
-**Date:** 2025-10-07
-**Status:** ✅ ALL TESTS PASSED
+**Date:** 2025-10-08
+**Status:** ✅ ALL TESTS PASSED (48 checks)
 
 ---
 
@@ -12,16 +12,15 @@
 | **Core** | `/health` | GET | ✅ PASS | Returns `{"status":"healthy"}` |
 | **Core** | `/` | GET | ✅ PASS | Returns API info |
 | **Core** | `/docs` | GET | ✅ PASS | Swagger UI accessible |
-| **Lines** | `/api/lines/` | GET | ✅ PASS | Returns 14 metro lines |
-| **Lines** | `/api/lines/?transport_type=metro` | GET | ✅ PASS | Filters by type |
-| **Lines** | `/api/lines/metros/1/stations` | GET | ✅ PASS | Returns stations |
-| **Traffic** | `/api/traffic/` | GET | ✅ PASS | Fallback response working |
-| **Traffic** | `/api/traffic/?line_code=1` | GET | ✅ PASS | Filtered response |
+| **Lines** | `/api/lines` | GET | ✅ PASS | Returns multi-network catalogue |
+| **Lines** | `/api/lines?transport_type=metro` | GET | ✅ PASS | Filters by network |
+| **Lines** | `/api/lines/metro/1` | GET | ✅ PASS | Stations + simulated trains |
+| **Traffic** | `/api/traffic/status` | GET | ✅ PASS | Normalised severity payload |
+| **Traffic** | `/api/traffic?line_code=1` | GET | ✅ PASS | Filtered response |
 | **Geo** | `/api/geo/nearest?lat=48.8584&lon=2.3470` | GET | ✅ PASS | Returns 5 nearest stations |
 | **Geo** | `/api/geo/nearest` (no params) | GET | ✅ PASS | Returns 422 validation error |
-| **Webhooks** | `/api/webhooks/` | GET | ✅ PASS | Returns empty list |
-| **Webhooks** | `/api/webhooks/` | POST | ✅ PASS | Creates subscription |
-| **Schedules** | `/api/schedules/metros/1/chatelet/A` | GET | ⚠️ WARN | External API may be slow |
+| **Webhooks** | `/api/webhooks` | POST/GET/DELETE | ✅ PASS | CRUD + Discord mock |
+| **Schedules** | `/api/schedules/metros/1/chatelet/A` | GET | ⚠️ WARN | External community feed offline |
 
 ---
 
@@ -52,31 +51,31 @@
 
 ---
 
-### 3. Get All Metro Lines
-**URL:** `GET /api/lines/`
+### 3. Get All Lines
+**URL:** `GET /api/lines`
 **Response Sample:**
 ```json
 {
   "lines": [
     {
       "code": "1",
-      "name": "La Défense - Château de Vincennes",
+      "name": "La Défense – Château de Vincennes",
       "type": "metro",
       "color": "#FFCD00"
     },
     {
-      "code": "2",
-      "name": "Porte Dauphine - Nation",
-      "type": "metro",
-      "color": "#003CA6"
+      "code": "A",
+      "name": "RER A",
+      "type": "rer",
+      "color": "#F9423A"
     }
-    // ... 12 more lines
+    // ... additional RER / Tram / Transilien entries
   ],
-  "count": 14
+  "count": 30
 }
 ```
 **Status:** ✅ PASS
-**Note:** Returns all 14 Paris metro lines with correct colors
+**Note:** Returns metro, RER, tram and Transilien lines with metadata
 
 ---
 
@@ -87,36 +86,46 @@
 
 ---
 
-### 5. Get Stations for Line
-**URL:** `GET /api/lines/metros/1/stations`
-**Response:** Returns stations data from RATP API
-**Status:** ✅ PASS
-
----
-
-### 6. Get Traffic Status
-**URL:** `GET /api/traffic/`
-**Response:**
+### 5. Get Line Details
+**URL:** `GET /api/lines/metro/1`
+**Response Snippet:**
 ```json
 {
-  "status": "unavailable",
-  "message": "Unable to fetch real-time traffic data. Please try again later.",
-  "error": "",
-  "source": "community_api_fallback",
-  "timestamp": "2025-10-07T01:10:54.188834",
-  "result": {
-    "metros": [
-      {
-        "line": "1",
-        "slug": "normal",
-        "title": "Traffic data unavailable"
-      }
-    ]
-  }
+  "line": {"code": "1", "name": "La Défense – Château de Vincennes", "type": "metro"},
+  "stations": [
+    {"name": "Argentine", "latitude": 48.8756, "longitude": 2.2894},
+    {"name": "Bastille", "latitude": 48.8520, "longitude": 2.3687}
+  ],
+  "stations_count": 25,
+  "trains": [
+    {"train_id": "1-1-0", "from_station": "Argentine", "to_station": "Bastille", "progress": 0.31}
+  ]
 }
 ```
 **Status:** ✅ PASS
-**Note:** Gracefully handles external API timeout with fallback response
+**Note:** Stations sourced from IDFM open data; train positions simulated until GTFS/SIRI feeds are authorised
+
+---
+
+### 6. Normalised Traffic Status
+**URL:** `GET /api/traffic/status`
+**Response Snippet:**
+```json
+{
+  "status": "ok",
+  "source": "prim_api",
+  "lines": [
+    {
+      "line_code": "1",
+      "level": "warning",
+      "message": "Minor delays",
+      "source": "prim"
+    }
+  ]
+}
+```
+**Status:** ✅ PASS
+**Note:** Uses PRIM `line_reports`, cached for 120 seconds
 
 ---
 
@@ -164,15 +173,11 @@
 
 ---
 
-### 9. List Webhook Subscriptions
-**URL:** `GET /api/webhooks/`
-**Response:**
-```json
-{
-  "subscriptions": [],
-  "count": 0
-}
-```
+### 9. Webhook CRUD
+- `POST /api/webhooks` – creates subscription and sends Discord confirmation (mocked in tests)
+- `GET /api/webhooks` – lists subscriptions
+- `DELETE /api/webhooks/{id}` – removes subscription
+
 **Status:** ✅ PASS
 
 ---
