@@ -51,7 +51,7 @@ class Settings:
         origin.strip()
         for origin in os.getenv(
             "CORS_ALLOW_ORIGINS",
-            "http://localhost:3000,http://localhost:8000,http://xps:3100",
+            "http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://xps:3100",
         ).split(",")
         if origin.strip()
     ]

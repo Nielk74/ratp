@@ -10,20 +10,18 @@ import type {
 } from "@/types";
 
 const DEFAULT_BACKEND_PORT = process.env.NEXT_PUBLIC_BACKEND_PORT || "8000";
-const FALLBACK_HOST = process.env.NEXT_PUBLIC_BACKEND_HOST;
 
 function resolveBaseUrl(): string {
   if (typeof window !== "undefined") {
     try {
       const url = new URL(window.location.href);
-      const host = FALLBACK_HOST || url.hostname;
-      return `${url.protocol}//${host}:${DEFAULT_BACKEND_PORT}`;
+      return `${url.protocol}//${url.hostname}:${DEFAULT_BACKEND_PORT}`;
     } catch (error) {
       console.error("Failed to resolve backend host from window.location", error);
     }
   }
 
-  const envHost = FALLBACK_HOST || "127.0.0.1";
+  const envHost = process.env.NEXT_PUBLIC_BACKEND_HOST || "127.0.0.1";
   return `http://${envHost}:${DEFAULT_BACKEND_PORT}`;
 }
 

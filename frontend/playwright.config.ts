@@ -1,5 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const backendHost = process.env.NEXT_PUBLIC_BACKEND_HOST || "127.0.0.1";
+const backendPort = process.env.NEXT_PUBLIC_BACKEND_PORT || "8000";
+
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 60_000,
@@ -19,6 +22,10 @@ export default defineConfig({
     timeout: 120_000,
     stdout: "pipe",
     stderr: "pipe",
+    env: {
+      NEXT_PUBLIC_BACKEND_HOST: backendHost,
+      NEXT_PUBLIC_BACKEND_PORT: backendPort,
+    },
   },
   projects: [
     {
