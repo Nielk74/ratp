@@ -1,0 +1,66 @@
+{
+  "scraped_at": "2025-10-08T22:05:44Z",
+  "source_file": "backend/tmp/after_select.html",
+  "line": "1",
+  "station": "Bastille",
+  "data": [
+    {
+      "direction_label": "Vers La Défense",
+      "departures": [
+        {
+          "destination": "La Défense (Grande Arche)",
+          "prochain_passage": "23:40"
+        },
+        {
+          "destination": "La Défense (Grande Arche)",
+          "prochain_passage": "23:45"
+        },
+        {
+          "destination": "La Défense (Grande Arche)",
+          "prochain_passage": "23:51"
+        },
+        {
+          "destination": "La Défense (Grande Arche)",
+          "prochain_passage": "23:55"
+        },
+        {
+          "destination": "La Défense (Grande Arche)",
+          "prochain_passage": "00:01"
+        },
+        {
+          "destination": "La Défense (Grande Arche)",
+          "prochain_passage": "00:06"
+        }
+      ]
+    },
+    {
+      "direction_label": "Vers Château de Vincennes",
+      "departures": [
+        {
+          "destination": "Château de Vincennes",
+          "prochain_passage": "23:38"
+        },
+        {
+          "destination": "Château de Vincennes",
+          "prochain_passage": "23:43"
+        },
+        {
+          "destination": "Château de Vincennes",
+          "prochain_passage": "23:49"
+        },
+        {
+          "destination": "Château de Vincennes",
+          "prochain_passage": "23:53"
+        },
+        {
+          "destination": "Château de Vincennes",
+          "prochain_passage": "23:58"
+        },
+        {
+          "destination": "Château de Vincennes",
+          "prochain_passage": "00:03"
+        }
+      ]
+    }
+  ]
+}

@@ -74,5 +74,8 @@ models/*.joblib
 
 # Temporary files
 tmp/
+!backend/tmp/
+backend/tmp/*
+!backend/tmp/ratp_sample.json
 temp/
 *.tmp
