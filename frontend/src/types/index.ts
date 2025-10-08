@@ -109,3 +109,44 @@ export interface WebhookSubscription {
   severity_filter?: string[];
   is_active: boolean;
 }
+
+
+export interface ScrapedDepartureInfo {
+  raw_text: string;
+  destination?: string | null;
+  waiting_time?: string | null;
+  status?: string | null;
+  platform?: string | null;
+  extra?: Record<string, unknown>;
+}
+
+export interface LineSnapshotStation {
+  name: string;
+  slug: string;
+  order: number;
+  direction: string;
+  direction_index?: number | null;
+  departures: ScrapedDepartureInfo[];
+  metadata: Record<string, unknown>;
+  error?: string | null;
+}
+
+export interface TrainEstimate {
+  direction: string;
+  from_station: string;
+  to_station: string;
+  eta_from: number | null;
+  eta_to: number | null;
+  progress: number;
+  absolute_progress: number;
+  confidence: "high" | "medium" | "low";
+}
+
+export interface LineSnapshot {
+  scraped_at: string;
+  network: string;
+  line: string;
+  stations: LineSnapshotStation[];
+  trains: Record<string, TrainEstimate[]>;
+  errors: string[];
+}

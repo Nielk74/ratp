@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Header } from "@/components/Header";
 import { TrafficStatus } from "@/components/TrafficStatus";
 import { NearestStations } from "@/components/NearestStations";
@@ -12,6 +12,7 @@ import type {
   LineDetails,
   LineStatusInfo,
   NormalizedTrafficStatus,
+  LineSnapshot,
 } from "@/types";
 
 const TRANSPORT_FILTERS: Array<{ value: Line["type"]; label: string; icon: string }> = [
@@ -30,6 +31,9 @@ export default function Home() {
   const [lineDetails, setLineDetails] = useState<LineDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
+  const [lineSnapshot, setLineSnapshot] = useState<LineSnapshot | null>(null);
+  const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [snapshotError, setSnapshotError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -112,6 +116,74 @@ export default function Home() {
     };
   }, [selectedLine]);
 
+  const loadSnapshot = useCallback(
+    async (forceRefresh = false) => {
+      if (!selectedLine) {
+        setLineSnapshot(null);
+        return;
+      }
+
+      const capturedLine = selectedLine;
+      const lineKey = `${capturedLine.type}-${capturedLine.code}`;
+
+      const isStillCurrent = () => {
+        if (!selectedLine) {
+          return false;
+        }
+        return `${selectedLine.type}-${selectedLine.code}` === lineKey;
+      };
+
+      setSnapshotLoading(true);
+      setSnapshotError(null);
+
+      try {
+        const snapshot = await apiClient.getLineSnapshot(
+          capturedLine.type,
+          capturedLine.code,
+          forceRefresh
+        );
+        if (!isStillCurrent()) {
+          return;
+        }
+        setLineSnapshot(snapshot);
+      } catch (error) {
+        console.error("Failed to load line snapshot:", error);
+        if (isStillCurrent()) {
+          setSnapshotError("Unable to load live train data.");
+          setLineSnapshot(null);
+        }
+      } finally {
+        if (isStillCurrent()) {
+          setSnapshotLoading(false);
+        }
+      }
+    },
+    [selectedLine],
+  );
+
+  useEffect(() => {
+    if (!selectedLine) {
+      setLineSnapshot(null);
+      setSnapshotError(null);
+      setSnapshotLoading(false);
+      return;
+    }
+
+    loadSnapshot(false);
+
+    const interval = setInterval(() => {
+      loadSnapshot(false);
+    }, 60000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [selectedLine, loadSnapshot]);
+
+  const handleSnapshotRefresh = useCallback(() => {
+    loadSnapshot(true);
+  }, [loadSnapshot]);
+
   const filteredLines = useMemo(
     () => lines.filter((line) => line.type === transportFilter),
     [lines, transportFilter],
@@ -184,6 +256,10 @@ export default function Home() {
                 status={lineStatus}
                 details={lineDetails}
                 loading={detailsLoading}
+                snapshot={lineSnapshot}
+                snapshotLoading={snapshotLoading}
+                snapshotError={snapshotError}
+                onRefreshSnapshot={handleSnapshotRefresh}
               />
               {detailsError && (
                 <p className="text-sm text-error mt-3">{detailsError}</p>

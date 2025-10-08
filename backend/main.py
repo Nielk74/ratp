@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 from .config import settings
 from .database import init_db
-from .api import lines, traffic, schedules, geo, webhooks
+from .api import lines, traffic, schedules, geo, webhooks, snapshots
 
 
 @asynccontextmanager
@@ -41,6 +41,7 @@ app.include_router(traffic.router, prefix="/api/traffic", tags=["Traffic"])
 app.include_router(schedules.router, prefix="/api/schedules", tags=["Schedules"])
 app.include_router(geo.router, prefix="/api/geo", tags=["Geolocation"])
 app.include_router(webhooks.router, prefix="/api/webhooks", tags=["Webhooks"])
+app.include_router(snapshots.router, prefix="/api/snapshots", tags=["Snapshots"])
 
 
 @app.get("/")

@@ -6,6 +6,7 @@ import type {
   NearestStationResult,
   Schedule,
   WebhookSubscription,
+  LineSnapshot,
 } from "@/types";
 
 const DEFAULT_BACKEND_PORT = process.env.NEXT_PUBLIC_BACKEND_PORT || "8000";
@@ -130,6 +131,16 @@ export const apiClient = {
     const { data } = await api.post("/api/webhooks/test", null, {
       params: { webhook_url: webhookUrl },
     });
+    return data;
+  },
+
+  async getLineSnapshot(
+    network: string,
+    lineCode: string,
+    refresh = false
+  ): Promise<LineSnapshot> {
+    const params = refresh ? { refresh: true } : {};
+    const { data } = await api.get(`/api/snapshots/${network}/${lineCode}`, { params });
     return data;
   },
 };

@@ -92,3 +92,9 @@ Once IDFM enables the official feeds:
 - If Cloudflare blocks automated runs, open `/horaires` manually, solve the
   challenge once in a real browser, and re-run the scraper—the clearance cookie
   is usually accepted by Playwright afterwards.
+
+## Line snapshot API
+
+- The endpoint `GET /api/snapshots/{network}/{line}` triggers sequential scrapes for every station+direction combination listed in `backend/services/station_data.py`.
+- Results are cached in-memory for 60 seconds and exposed to the frontend map view. Each station entry includes the raw Playwright metadata as well as an inferred train list (`trains`) keyed by direction.
+- You can force a refresh with `?refresh=true`. Keep `max_workers` at 1–2 to avoid Cloudflare challenges.
