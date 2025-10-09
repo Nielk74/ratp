@@ -33,14 +33,17 @@ test.describe("Live line workflow", () => {
     await expect(async () => {
       const count = await stationItems.count();
       expect(count).toBeGreaterThan(0);
-    }).toPass({ timeout: 60_000, intervals: [2000] });
+    }).toPass({ timeout: 180_000, intervals: [3000, 5000] });
   });
 
   test("shows live map tab populated with real departures", async ({ page, request }) => {
     const { code } = await selectFirstLine(page);
 
     await expect(async () => {
-      const response = await request.get(`http://127.0.0.1:8000/api/snapshots/metro/${code}?refresh=true`);
+      const response = await request.get(
+        `http://127.0.0.1:8000/api/snapshots/metro/${code}?refresh=true`,
+        { timeout: 180_000 }
+      );
       const data = await response.json();
       const hasDepartures = Array.isArray(data?.stations) && data.stations.some((station: any) =>
         Array.isArray(station.departures) && station.departures.some((dep: any) => {
@@ -50,7 +53,7 @@ test.describe("Live line workflow", () => {
       );
 
       expect(hasDepartures).toBeTruthy();
-    }).toPass({ timeout: 120_000, intervals: [3000, 5000] });
+    }).toPass({ timeout: 180_000, intervals: [3000, 5000] });
 
     await page.getByRole("button", { name: "Live map" }).click();
 

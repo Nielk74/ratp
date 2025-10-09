@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from threading import Lock
@@ -10,7 +10,9 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pytz
 
-from .ratp_playwright import RatpPlaywrightScraper, ScraperResult
+from .navitia_scraper import NavitiaScraper
+from .ratp_http import RatpHttpScraper
+from .ratp_playwright import ScraperResult
 from ..station_data import STATION_FALLBACKS
 
 
@@ -177,35 +179,78 @@ class LineSnapshotService:
         if not jobs:
             raise ValueError(f"No station fallback data for {network} line {line}")
 
-        scraper = RatpPlaywrightScraper(headless=True, challenge_delay=8.0, wait_timeout=45.0)
-        station_snapshots: List[StationSnapshot] = []
+        navitia_scraper: Optional[NavitiaScraper] = None
+        navitia_init_error: Optional[str] = None
+        try:
+            navitia_scraper = NavitiaScraper()
+        except Exception as exc:  # pylint: disable=broad-except
+            navitia_init_error = str(exc)
+
+        http_scraper = RatpHttpScraper()
         errors: List[str] = []
+        station_snapshots_opt: List[Optional[StationSnapshot]] = [None] * len(jobs)
 
-        pause_seconds = max(0.5, 2.0 / max(1, max_workers))
+        max_workers = max(1, min(max_workers, len(jobs), 6))
 
-        for job in jobs:
+        def _run_job(index: int, job: StationJob):
             try:
-                result = scraper.fetch_station_board(
-                    line=job.line,
-                    station=job.slug,
-                    direction=job.direction,
-                    network=job.network,
-                    language="fr",
-                )
-                station_snapshots.append(self._build_station_snapshot(job, result))
+                navitia_error: Optional[str] = None
+                result: Optional[ScraperResult] = None
+                if navitia_scraper:
+                    try:
+                        result = navitia_scraper.fetch_station_board(
+                            network=job.network,
+                            line=job.line,
+                            station=job.slug,
+                            direction=job.direction,
+                        )
+                    except Exception as nav_exc:  # pylint: disable=broad-except
+                        navitia_error = str(nav_exc)
+
+                if result is None:
+                    try:
+                        result = http_scraper.fetch_station_board(
+                            network=job.network,
+                            line=job.line,
+                            station=job.slug,
+                            direction=job.direction,
+                        )
+                        if navitia_error:
+                            result.metadata.setdefault("navitia_error", navitia_error)
+                    except Exception as http_exc:  # pylint: disable=broad-except
+                        combined_error = navitia_error or ""
+                        if navitia_error:
+                            combined_error += " | "
+                        combined_error += str(http_exc)
+                        raise RuntimeError(combined_error) from http_exc
+
+                snapshot = self._build_station_snapshot(job, result)
+                return index, snapshot, None
             except Exception as exc:  # pylint: disable=broad-except
                 error_message = f"{job.slug} ({job.direction}): {exc}"
-                errors.append(error_message)
-                station_snapshots.append(
-                    StationSnapshot(
-                        job=job,
-                        departures=[],
-                        metadata={"error": str(exc)},
-                        error=str(exc),
-                    )
+                snapshot = StationSnapshot(
+                    job=job,
+                    departures=[],
+                    metadata={"error": str(exc)},
+                    error=str(exc),
                 )
-            finally:
-                time.sleep(pause_seconds)
+                return index, snapshot, error_message
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [
+                executor.submit(_run_job, idx, job)
+                for idx, job in enumerate(jobs)
+            ]
+            for future in as_completed(futures):
+                index, snapshot, error_message = future.result()
+                station_snapshots_opt[index] = snapshot
+                if error_message:
+                    errors.append(error_message)
+
+        if navitia_init_error:
+            errors.append(f"Navitia init failed: {navitia_init_error}")
+
+        station_snapshots = [snapshot for snapshot in station_snapshots_opt if snapshot is not None]
 
         direction_sequences = self._assign_direction_indices(station_snapshots)
         trains = self._infer_trains(direction_sequences)

@@ -17,7 +17,7 @@ async def get_line_snapshot(
     network: str,
     line_code: str,
     refresh: bool = Query(False, description="Force a fresh scrape instead of cached data."),
-    max_workers: int = Query(1, ge=1, le=4, description="Maximum worker processes. Values above 2 may trigger Cloudflare."),
+    max_workers: int = Query(4, ge=1, le=6, description="Maximum parallel fetches against ratp.fr."),
 ):
     """Return the aggregated scraper snapshot for a given line."""
     loop = asyncio.get_running_loop()

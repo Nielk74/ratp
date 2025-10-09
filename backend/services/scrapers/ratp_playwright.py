@@ -13,6 +13,11 @@ from __future__ import annotations
 
 import json
 import time
+import os
+import random
+import subprocess
+import contextlib
+import time
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import quote_plus
@@ -63,10 +68,52 @@ class RatpPlaywrightScraper:
         headless: bool = True,
         challenge_delay: float = 8.0,
         wait_timeout: float = 20.0,
+        use_xvfb: bool = False,
     ) -> None:
         self.headless = headless
         self.challenge_delay = challenge_delay
         self.wait_timeout = wait_timeout
+        self.use_xvfb = use_xvfb
+
+    @contextlib.contextmanager
+    def _virtual_display(self):
+        if self.headless or os.getenv("DISPLAY"):
+            yield
+            return
+
+        if not self.use_xvfb:
+            yield
+            return
+
+        display_id = f":{random.randint(90, 110)}"
+        cmd = [
+            "Xvfb",
+            display_id,
+            "-screen",
+            "0",
+            "1280x1024x24",
+            "-nolisten",
+            "tcp",
+        ]
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(0.5)
+        if proc.poll() is not None:
+            raise RuntimeError("Failed to start Xvfb display")
+        original_display = os.getenv("DISPLAY")
+        os.environ["DISPLAY"] = display_id
+        try:
+            yield
+        finally:
+            if original_display is not None:
+                os.environ["DISPLAY"] = original_display
+            else:
+                os.environ.pop("DISPLAY", None)
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
 
     def fetch_station_board(
         self,
@@ -80,12 +127,13 @@ class RatpPlaywrightScraper:
         """Fetch live departure information for the requested station."""
 
         url = self._build_url(network=network, line=line, station=station, direction=direction)
-        with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(
-                headless=self.headless,
-                args=[
-                    "--disable-gpu",
-                    "--no-sandbox",
+        with self._virtual_display():
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch(
+                    headless=self.headless,
+                    args=[
+                        "--disable-gpu",
+                        "--no-sandbox",
                     "--disable-dev-shm-usage",
                     "--disable-blink-features=AutomationControlled",
                     "--lang=%s" % language,
