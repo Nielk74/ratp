@@ -1,28 +1,32 @@
 # Handoff Instructions for Next Assistant
 
 ## Context
-- Repository: `/home/antoine/projects/ratp`
-- Playwright scraper lives in `backend/services/scrapers/ratp_playwright.py`; helper exports are wired via `backend/services/scrapers/__init__.py`.
-- Docs and run notes: `backend/SCRAPER_EXPERIMENT.md` (updated with the new fallback flow).
-- Dependencies come from `backend/.venv`; `python -m playwright install chromium` already ran and `beautifulsoup4` is now part of `backend/requirements.txt`.
-- A real capture for Metro 1 → Bastille (both directions) is stored at `backend/tmp/ratp_sample.json` for reference. It was scraped via the timetable DOM, not the legacy API.
-- Current limitation: repeated scripted hits triggered Cloudflare’s “Un instant…” interstitial. The scraper now flags `cloudflare_blocked=True` in the metadata when that happens.
+- Repository root: `/home/antoine/projects/ratp`
+- Scraper stack:
+  - Station-level Playwright scraper: `backend/services/scrapers/ratp_playwright.py`
+  - Line-wide aggregation + inferred trains: `backend/services/scrapers/line_snapshot.py` exposed via `GET /api/snapshots/{network}/{line}`
+  - Export convenience in `backend/services/scrapers/__init__.py`
+- Docs & SOP: `backend/SCRAPER_EXPERIMENT.md` (includes snapshot API section)
+- Frontend side:
+  - Live map tab (line sidebar) renders snapshot data via `frontend/src/components/LineLiveMap.tsx`
+  - API client auto-resolves backend host (`frontend/src/services/api.ts`)
+- Tooling:
+  - Playwright config lives in `frontend/playwright.config.ts`
+  - Real E2E test: `frontend/tests/e2e/line-live-map.spec.ts`
+  - New helper script `serve.sh` starts backend on `0.0.0.0:8000` and Next.js dev server on `0.0.0.0:8001`
+- Dependencies are already installed; browsers via `npx playwright install` exist under `frontend`
 
 ## Goal
-Stabilise the scraper workflow so it can reliably deliver fresh departures that downstream services can consume until official SIRI / GTFS-RT feeds are available.
+Boost confidence in the live map workflow by expanding realistic automated tests and iterating on train inference accuracy while waiting for official GTFS feeds.
 
 ## Suggested Next Tasks
-1. **Regain access past Cloudflare:** wait for the cooldown or hop onto a fresh IP, then run
-   ```bash
-   backend/.venv/bin/python -m backend.services.scrapers.ratp_playwright \
-     --network metro --line 1 --station Bastille --direction A \
-     --no-headless --wait-timeout 60 --challenge-delay 15
-   ```
-   Confirm `cloudflare_blocked` is `False` and that departures come from the timetable DOM when the API is unavailable.
-2. **Package the output:** design a thin wrapper (CLI or background job) that stores the JSON output somewhere the backend can reach (e.g., S3, Redis, or a temporary DB table). Re-use the structure shown in `backend/tmp/ratp_sample.json`.
-3. **Plan integration:** sketch how the backend would surface these scraped departures (endpoint contract, cache TTL, error handling when Cloudflare blocks us). Update the experiment doc with any new caveats.
+1. **Grow Playwright coverage:** Add more scenarios (multi-line selection, error states, verified train markers). Run with `cd frontend && npm run test:e2e`. The tests hit real endpoints, so ensure the backend is running (use `./serve.sh` or equivalent).
+2. **Refine train inference:** Improve `_infer_trains` in `line_snapshot.py` (handle HH:MM waits, multiple departures, confidence levels). Back changes with unit tests in `backend/tests`.
+3. **Snapshot caching/persistence:** Consider Redis or a scheduled job so multiple users/tests don’t re-trigger the full Playwright scrape each time. Document any Cloudflare limits encountered.
+4. **Map UX polish:** Replace the schematic with a Leaflet/Mapbox view using station coordinates, animate train markers using `absolute_progress`.
 
 ## Reminders
-- The scraper can fall back to the `/horaires` search form; this is slower but survives Cloudflare’s managed challenge. `metadata.form_flow` indicates when that path was used.
-- Always avoid fabricating data—only export what the DOM/API returns.
-- If you need to reinstall browsers, run inside the virtualenv: `cd backend && . .venv/bin/activate` then `python -m playwright install chromium`.
+- Scraper fallback to `/horaires` is slower but necessary; check `metadata.form_flow` & `cloudflare_blocked` to detect Cloudflare hurdles.
+- Never fabricate data—store only what the DOM/API returned. Manual captures belong under `backend/tmp/` (`ratp_sample.json` already kept).
+- Playwright browsers are installed under `frontend`; rerun `npx playwright install` if needed.
+- Use `./serve.sh` for local dev (Ctrl+C cleans up both processes).
