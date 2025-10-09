@@ -79,3 +79,6 @@ backend/tmp/*
 !backend/tmp/ratp_sample.json
 temp/
 *.tmp
+
+# Playwright artifacts
+frontend/test-results/
