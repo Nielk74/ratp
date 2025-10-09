@@ -1,6 +1,6 @@
 # RATP Live Tracker - Endpoint Test Results
 
-**Date:** 2025-10-08
+**Date:** 2025-10-09
 **Status:** ✅ ALL TESTS PASSED (48 checks)
 
 ---
@@ -14,7 +14,7 @@
 | **Core** | `/docs` | GET | ✅ PASS | Swagger UI accessible |
 | **Lines** | `/api/lines` | GET | ✅ PASS | Returns multi-network catalogue |
 | **Lines** | `/api/lines?transport_type=metro` | GET | ✅ PASS | Filters by network |
-| **Lines** | `/api/lines/metro/1` | GET | ✅ PASS | Stations + simulated trains |
+| **Lines** | `/api/lines/metro/1` | GET | ✅ PASS | Stations + inferred trains (Navitia snapshot) |
 | **Traffic** | `/api/traffic/status` | GET | ✅ PASS | Normalised severity payload |
 | **Traffic** | `/api/traffic?line_code=1` | GET | ✅ PASS | Filtered response |
 | **Geo** | `/api/geo/nearest?lat=48.8584&lon=2.3470` | GET | ✅ PASS | Returns 5 nearest stations |
@@ -103,7 +103,7 @@
 }
 ```
 **Status:** ✅ PASS
-**Note:** Stations sourced from IDFM open data; train positions simulated until GTFS/SIRI feeds are authorised
+**Note:** Stations sourced from IDFM open data; departures sourced from Navitia stop areas with HTTP fallback until SIRI/GTFS feeds unlock real vehicle positions
 
 ---
 

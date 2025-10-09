@@ -5,7 +5,7 @@ Modern Next.js 14 frontend for real-time Paris public transport monitoring.
 ## Features
 
 - 📊 **Network Dashboard**: Filterable views for Metro, RER, Tram, and Transilien lines
-- 🧭 **Line Details Panel**: Station roster plus (for now) simulated train positions
+- 🧭 **Line Details Panel**: Station roster plus (for now) inferred train positions (Navitia primary, HTTP fallback)
 - 🔔 **Webhook Manager**: Create, list, and delete Discord subscriptions with severity filters
 - 📍 **Nearest Stations**: Client-side geolocation to find the closest stops
 - 📱 **Responsive Design**: Tailored for desktop and mobile with Tailwind CSS
@@ -37,10 +37,10 @@ npm install
 cp .env.local.example .env.local
 
 # Start development server
-npm run dev
+npm run dev -- --hostname 127.0.0.1 --port 8001
 ```
 
-The application will be available at `http://localhost:3000`
+The application will be available at `http://127.0.0.1:8001` (auto-discovers backend host)
 
 ### Environment Variables
 
@@ -52,6 +52,11 @@ NEXT_PUBLIC_BACKEND_HOST=xps
 NEXT_PUBLIC_BACKEND_PORT=8000
 ```
 By default the client infers the backend origin from the current browser hostname.
+
+### Dev helpers
+
+- `../serve.sh` – spins up backend + frontend dev servers, killing stale ones first.
+- `../scripts/run_e2e.sh` – spins up the stack, runs Playwright e2e tests, tears everything down.
 
 ## Project Structure
 
@@ -99,7 +104,7 @@ npm run type-check       # TypeScript type checking
 - `Header` – navigation bar with live indicator and API docs shortcut
 - `TrafficStatus` – responsive grid of line cards with selection handling
 - `LineCard` – status chip, colour bubble, and active-state styles
-- `LineDetailsPanel` – station roster & (current) simulated vehicles
+- `LineDetailsPanel` – station roster & (current) inferred vehicles from Navitia snapshot
 - `NearestStations` – geolocation-based finder
 
 ## API Integration
@@ -118,8 +123,9 @@ const traffic = await apiClient.getTraffic();
 // Find nearest stations
 const { results } = await apiClient.getNearestStations(lat, lon);
 
-// Fetch detailed line information (stations + simulated trains)
+// Fetch detailed line information (stations + inferred trains (Navitia snapshot))
 const details = await apiClient.getLineDetails("metro", "1");
+const snapshot = await apiClient.getLineSnapshot("metro", "1");
 ```
 
 ## Styling
@@ -132,11 +138,11 @@ Built with Tailwind CSS utility classes:
 
 ## Future Enhancements
 
-- [ ] Interactive Leaflet map
-- [ ] Real-time WebSocket updates
-- [ ] Webhook management UI
-- [ ] Schedule viewer for stations
-- [ ] Traffic forecast predictions
+- [ ] Upgrade live map to Leaflet/Mapbox with animated markers
+- [ ] Real-time WebSocket/SSE updates for snapshots
+- [ ] Surface Navitia vs fallback state directly in the UI
+- [ ] Schedule viewer for stations (once SIRI/GTFS feeds unlock)
+- [ ] Traffic forecast visualisations
 - [ ] PWA support for offline access
 - [ ] Dark mode toggle
 

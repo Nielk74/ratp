@@ -1,8 +1,8 @@
 # RATP Live Tracker - Project Plan & Architecture
 
 **Version:** 1.0
-**Last Updated:** 2025-10-07
-**Status:** Phase 1 - Initial Setup
+**Last Updated:** 2025-10-09
+**Status:** Phase 1 - Snapshot Integration
 
 ---
 
@@ -56,12 +56,11 @@ RATP Live Tracker is a modern, real-time monitoring system for Paris public tran
 ### Component Breakdown
 
 #### 1. **Backend (FastAPI + Python)**
-- **API Routes**: RESTful endpoints for frontend consumption
-- **RATP Client Service**: Handles API calls to PRIM and community APIs
-- **Cache Layer**: Redis for rate limit management and data caching
-- **Database Models**: SQLAlchemy ORM for PostgreSQL
-- **Background Tasks**: Celery for periodic data fetching and forecasting
-- **WebSocket Server**: Real-time updates to connected clients
+- **API Routes**: REST endpoints (`/api/lines`, `/api/traffic`, `/api/snapshots`, `/api/geo`, `/api/webhooks`)
+- **Scraper Services**: Navitia/PRIM client plus Cloudflare-aware HTTP fallback (Playwright reserved for cookie refreshing/manual capture)
+- **Persistence**: SQLAlchemy + SQLite (migration path to Postgres when long-term storage expands)
+- **Caching & Settings**: Snapshot cache with TTL, Pydantic settings, fallback metadata for observability
+- **Testing**: Pytest suite (~48 tests) covering clients, services, and routers
 
 #### 2. **Frontend (Next.js + React)**
 - **Dashboard**: Real-time network overview
@@ -70,11 +69,11 @@ RATP Live Tracker is a modern, real-time monitoring system for Paris public tran
 - **Geolocation Service**: Find nearest stops with live data
 - **Responsive Design**: TailwindCSS for mobile-first UI
 
-#### 3. **Data Layer (PostgreSQL)**
-- **Historical Data**: Store traffic events, schedules, delays
-- **User Subscriptions**: Discord webhook configurations
-- **Forecasting Dataset**: Time-series data for ML predictions
-- **Cache Tables**: Temporary storage for API responses
+#### 3. **Data Layer (SQLite today, Postgres later)**
+- **Current State**: SQLite file (`ratp.db`) managed via SQLAlchemy for local development and testing
+- **Planned Migration**: Move to Postgres once we persist historical schedules + analytics
+- **What’s Stored**: Lines, stations, webhook subscriptions, cached traffic entries
+- **Future Tables**: Forecasting datasets and long-term traffic history once storage is upgraded
 
 ---
 
@@ -87,37 +86,38 @@ RATP Live Tracker is a modern, real-time monitoring system for Paris public tran
 - [x] Document technology stack
 
 ### 🔄 Phase 1: Backend Foundation (IN PROGRESS)
-- [ ] Set up Python virtual environment
-- [ ] Install FastAPI, SQLAlchemy, Redis, Celery
-- [ ] Create database schema and models
-- [ ] Implement RATP API client with rate limiting
-- [ ] Build caching layer (Redis)
-- [ ] Create basic REST API endpoints
-- [ ] Add error handling and logging
-- [ ] Write unit tests for API client
+- [x] Set up Python virtual environment & dependency management
+- [x] Install FastAPI, SQLAlchemy, Playwright toolchain
+- [x] Create base schema and models (lines, stations, webhooks)
+- [x] Implement Navitia client with HTTP fallback and rate limiting
+- [ ] Add external cache (Redis) for cross-process snapshots
+- [ ] Schedule/background runner (Celery or APScheduler) for periodic refreshes
+- [x] Deliver REST API endpoints with detailed metadata + logging
+- [x] Write unit tests for scraper/client layer
 
 **Duration:** 1-2 weeks
 **Priority:** HIGH
 
 ### 📅 Phase 2: Core Features
-- [ ] Implement traffic incident fetching
-- [ ] Build real-time schedule endpoint
-- [ ] Create geolocation service (nearest stops)
-- [ ] Set up WebSocket for live updates
-- [ ] Implement Discord webhook system
-- [ ] Add subscription management endpoints
-- [ ] Write integration tests
+- [x] Traffic incident ingestion via PRIM Navitia (`line_reports`)
+- [x] Geolocation service for nearest stops
+- [x] Discord webhook CRUD + confirmation pings
+- [ ] Persist snapshot history & expose analytics endpoints
+- [ ] Introduce WebSocket or SSE layer for live refreshes
+- [ ] Harden schedule endpoint once official feeds return (SIRI / GTFS-RT)
+- [ ] Broaden integration + contract tests
 
 **Duration:** 2-3 weeks
 **Priority:** HIGH
 
 ### 📅 Phase 3: Frontend Development
-- [ ] Initialize Next.js project with TypeScript
-- [ ] Set up TailwindCSS and component library
-- [ ] Build dashboard layout and navigation
-- [ ] Create line status cards with live data
-- [ ] Implement interactive map (Leaflet.js)
-- [ ] Build alert configuration UI
+- [x] Initialize Next.js project with TypeScript + TailwindCSS
+- [x] Build dashboard layout, navigation, and line status cards
+- [x] Implement live line sidebar (stations + live map tab)
+- [x] Alert configuration UI with Discord webhook CRUD
+- [ ] Upgrade live map to Leaflet/Mapbox with real geometry
+- [ ] Surface fallback states (HTTP vs Navitia) directly in UI
+- [ ] Polish mobile responsiveness and loading states
 - [ ] Add geolocation-based stop finder
 - [ ] Implement responsive mobile design
 - [ ] Write frontend unit tests (Vitest/Jest)
@@ -457,33 +457,32 @@ Examples:
 ### Immediate Tasks
 1. ✅ Research RATP APIs
 2. ✅ Design system architecture
-3. 🔄 Create project structure
-4. 🔄 Document project plan
-5. ⏳ Set up Python backend environment
-6. ⏳ Initialize database schema
-7. ⏳ Implement RATP API client
+3. ✅ Create project structure
+4. 🔄 Continue documenting project plan / decisions
+5. ✅ Set up Python backend environment
+6. ✅ Initialize database schema (SQLite for now)
+7. ✅ Implement Navitia API client with HTTP fallback
 
-### 🚆 Real-Time Train Position Plan (Research 2025-10-08)
-- **Live feeds status:** No public endpoints currently return train positions; community API remains offline. PRIM Navitia/SIRI/GTFS-RT URLs respond with `no Route matched` for the current key, confirming access is restricted.
-- **Required action:** Contact Île-de-France Mobilités via the PRIM portal and request activation for real-time feeds (SIRI StopMonitoring, GTFS-RT vehicle_positions/trip_updates, or Navitia coverage stop_schedules). Specify the lines/modes needed (Metro, RER, Transilien, Tram).
+### 🚆 Real-Time Train Position Plan (Updated 2025-10-09)
+- **Current status:** Navitia `line_reports`, `lines`, and `stop_areas` endpoints are live and power the `/api/snapshots` aggregation. GTFS-RT / SIRI vehicle feeds remain locked behind IDFM approval, so no true vehicle positions yet.
+- **Required action:** Request activation for SIRI StopMonitoring or GTFS-RT (vehicle_positions/trip_updates) via the PRIM portal. Specify target networks (Metro, RER, Transilien, Tram) and planned usage.
 - **Backend plan once enabled:**
-  * Create a `VehiclePositionService` that polls the authorised feed, decodes vehicle locations, and stores snapshots (vehicle_id, line_code, lat/lon, next_stop, timestamp) for later analytics.
-  * Expose REST endpoints such as `GET /api/lines/{type}/{code}/vehicles` providing live positions, inferred ETAs, and headways.
-  * Persist historical snapshots in a dedicated table to power forecasting and reliability metrics.
-- **Fallback approach:** If GTFS-RT is still unavailable after the request, use SIRI StopMonitoring arrivals to infer train progress between stations. This still requires SIRI access; without it we will not fabricate positions.
-- **Next checkpoint:** Re-test feed URLs once IDFM confirms activation; resume backend ingestion and UI work immediately afterwards.
+  * Add a `VehiclePositionService` polling authorised feeds, storing snapshots, and enriching the existing `LineSnapshot` payload with real coordinates/mission data.
+  * Expose `GET /api/lines/{type}/{code}/vehicles` and include vehicle summaries in `/api/snapshots`.
+  * Persist historical vehicle snapshots for reliability metrics and forecasting.
+- **Interim approach:** Continue inferring trains from waiting times and Navitia stop departures; surface fallback metadata to the frontend so users know when data is inferred.
+- **Next checkpoint:** Re-test the SIRI/GTFS endpoints after IDFM grants access; then prioritise ingestion + map visualisation updates.
 
 ### This Week
-- Complete backend foundation
-- Create basic API endpoints
-- Set up testing framework
-- Initialize frontend project
+- Finalise Navitia/HTTP fallback telemetry and retry logic
+- Expand Playwright coverage (fallback scenarios, error states)
+- Document onboarding for `scripts/run_e2e.sh` + `serve.sh`
 
 ### This Month
-- Core features implementation
-- Frontend development
-- Integration testing
-- Discord webhook system
+- Persist snapshot history + analytics endpoints
+- Upgrade live map UI (Leaflet/Mapbox) with fallback indicators
+- Prepare SIRI/GTFS ingestion pipeline pending IDFM approval
+- Continue Discord/webhook UX refinements
 
 ---
 
@@ -508,4 +507,5 @@ Examples:
 ---
 
 **Document Version History:**
+- v1.1 (2025-10-09): Snapshot integration with Navitia + updated testing plan
 - v1.0 (2025-10-07): Initial architecture and roadmap

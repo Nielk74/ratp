@@ -10,6 +10,8 @@
 
 After extensive research and testing, **only the PRIM API (Île-de-France Mobilités)** provides working real-time traffic data. The community RATP API remains down, while Île-de-France Mobilités open data offers reliable station catalogues but no live vehicle feeds.
 
+**Update (2025-10-09):** Navitia `line_reports`, `lines`, and `stop_areas` endpoints are now integrated in production; community and SIRI feeds remain pending. Use this document for historical testing notes and future feed activation steps.
+
 ### Recommendations
 
 1. ✅ **Use PRIM API** - Official, free, reliable real-time traffic data

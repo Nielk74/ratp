@@ -13,6 +13,7 @@ Real-time monitoring system for Paris public transport (RATP) with live traffic 
 
 ### ✅ Backend Highlights
 - **Live Traffic Status** sourced from PRIM Navitia (`line_reports`) with caching & rate-limit protection
+- **Snapshot API**: Station boards via Navitia stop areas + Cloudflare-aware HTTP fallback, with metadata to spot inferred data
 - **Multi-network Line Catalogue** (Metro, RER, Tram, Transilien) enriched with IDFM open-data stations
 - **Discord Webhooks** with confirmation messages and CRUD endpoints
 - **Geolocation & Utilities**: nearest-station search, in-memory cache, typed configuration
@@ -22,7 +23,7 @@ Real-time monitoring system for Paris public transport (RATP) with live traffic 
 
 ### ✅ Frontend Highlights
 - **Network Toggles** to switch between Metro / RER / Tram / Transilien views
-- **Line Details Panel** with ordered station list and (currently) simulated train markers
+- **Line Details Panel** with ordered station list and inferred train markers (Navitia data with HTTP fallback)
 - **Discord Webhook Manager** page for creating, listing, and deleting alerts
 - **Nearest Stations Widget** with client-side geolocation
 - **Responsive Next.js 14 UI** refreshing data every two minutes
@@ -89,10 +90,10 @@ cp .env.example .env
 # Edit .env with your API keys (PRIM_API_KEY is optional)
 
 # Run the server
-python main.py
+PYTHONPATH="$(pwd)/.." uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 
-The API will be available at `http://localhost:8000`
+API docs: `http://127.0.0.1:8000/docs` (health: `/health`)
 
 **Backend Documentation:**
 - **Interactive Docs (Swagger)**: http://localhost:8000/docs
@@ -116,10 +117,15 @@ cp .env.local.example .env.local
 # Override with NEXT_PUBLIC_BACKEND_HOST / NEXT_PUBLIC_BACKEND_PORT if needed
 
 # Start development server
-npm run dev
+npm run dev -- --hostname 127.0.0.1 --port 8001
 ```
 
-The frontend will be available at `http://localhost:3000`
+The frontend will be available at `http://127.0.0.1:8001`
+
+### Dev helpers
+
+- `./serve.sh` – kills stale `uvicorn`/`next` processes, then starts backend (8000) and a Next.js dev server (first free port from 8001).
+- `./scripts/run_e2e.sh` – launches the stack, runs Playwright e2e specs, streams progress, and tears everything down (log tails on failure).
 
 ### Running Tests
 
@@ -141,7 +147,8 @@ npm run lint
 ### Lines
 - `GET /api/lines` – List all networks (metro, rer, tram, transilien)
 - `GET /api/lines?transport_type=metro` – Filter by transport type
-- `GET /api/lines/{type}/{code}` – Detailed line payload (stations + simulated trains)
+- `GET /api/lines/{type}/{code}` – Detailed line payload (stations + inferred trains via Navitia snapshot)
+- `GET /api/snapshots/{network}/{line}` – Aggregated station boards (Navitia primary, HTTP fallback)
 - `GET /api/lines/{type}/{code}/stations` – Raw station feed for integrations
 
 ### Traffic
@@ -175,6 +182,8 @@ pytest --cov=backend --cov-report=html
 # Run specific test file
 pytest backend/tests/test_ratp_client.py
 ```
+
+For full-stack + Playwright validation run `./scripts/run_e2e.sh` from the repo root (it spins up the stack, runs tests, and tears everything down).
 
 ---
 

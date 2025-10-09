@@ -7,7 +7,7 @@
 
 ## 📊 Project Statistics
 
-### Code Statistics *(as of 2025-10-08)*
+### Code Statistics *(as of 2025-10-09)*
 - **Backend**: FastAPI app + services (30+ Python modules)
 - **Frontend**: Next.js App Router with React components & pages
 - **Tests**: 48 automated checks across 8 modules
@@ -24,19 +24,21 @@
 ### Backend (FastAPI + SQLite)
 1. **API Surface**
    - `/api/lines` – network catalogue with optional type filter
-   - `/api/lines/{type}/{code}` – detailed line payload (stations + simulated trains)
-   - `/api/traffic/status` – normalised traffic severity map
+   - `/api/lines/{type}/{code}` – detailed line payload (stations + inferred trains)
+   - `/api/snapshots/{network}/{line}` – Navitia-backed station boards with fallback metadata
+   - `/api/traffic/status` – normalised traffic severity map (PRIM `line_reports`)
    - `/api/webhooks` – Discord subscription CRUD + confirmation pings
    - `/api/geo/nearest` – geolocation search
-   - `/api/schedules` – legacy passthrough (currently awaiting external feed restoration)
+   - `/api/schedules` – legacy passthrough (awaiting official feed restoration)
 
 2. **Services**
-   - PRIM Navitia client with caching & rate limiting
-   - IDFM open-data station enrichment and train simulation helper
-   - Discord webhook dispatcher and geolocation utilities
+   - Navitia client (primary) with per-request caching & rate limiting
+   - Cloudflare-aware HTTP fallback + Playwright cookie seeding for `/horaires`
+   - IDFM open-data enrichment, Discord webhook dispatcher, geolocation utilities
 
-3. **Testing**
+3. **Testing & Automation**
    - 48 automated tests (pytest) covering services, models, and endpoints
+   - `scripts/run_e2e.sh` orchestrates full-stack Playwright runs (spin up, test, tear down)
 
 ### Frontend (Next.js 14 + Tailwind CSS)
 1. **Pages & Views**
@@ -48,6 +50,7 @@
 
 3. **Features**
    - Auto refresh (120s), responsive layouts, dynamic API host detection
+   - Live map tab driven by `/api/snapshots` with fallback indicators still to surface
    - Client geolocation for station proximity
 
 ---
@@ -115,19 +118,25 @@ cd backend
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
-python main.py
+cp .env.example .env  # set PRIM_API_KEY + optional overrides
+PYTHONPATH="$(pwd)/.." uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
-Access at: http://localhost:8000
+API docs: http://127.0.0.1:8000/docs (health: `/health`)
 
 #### Frontend
 ```bash
 cd frontend
 npm install
 cp .env.local.example .env.local
-npm run dev
+npm run dev -- --hostname 127.0.0.1 --port 8001
 ```
-Access at: http://localhost:3000
+Frontend: http://127.0.0.1:8001 (default host auto-detects backend)
+
+#### One-command dev stack
+```bash
+./serve.sh
+```
+This kills stale `uvicorn`/`next` processes, starts the backend (port 8000) and a Next dev server (first free port starting at 8001).
 
 ### Production Deployment
 
