@@ -11,9 +11,9 @@ cleanup() {
 trap cleanup SIGINT SIGTERM EXIT
 
 (
-  cd "$ROOT_DIR/backend"
+  cd "$ROOT_DIR"
   echo "[serve] starting backend on 0.0.0.0:8000"
-  "$ROOT_DIR/backend/.venv/bin/uvicorn" backend.main:app --host 0.0.0.0 --port 8000
+  PYTHONPATH="$ROOT_DIR" "$ROOT_DIR/backend/.venv/bin/uvicorn" backend.main:app --host 0.0.0.0 --port 8000
 ) &
 
 (
