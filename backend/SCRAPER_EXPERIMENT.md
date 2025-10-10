@@ -95,6 +95,6 @@ Once IDFM enables the official feeds:
 
 ## Line snapshot API
 
-- The endpoint `GET /api/snapshots/{network}/{line}` triggers sequential scrapes for every station+direction combination listed in `backend/services/station_data.py`.
-- Results are cached in-memory for 60 seconds and exposed to the frontend map view. Each station entry includes the raw Playwright metadata as well as an inferred train list (`trains`) keyed by direction.
-- You can force a refresh with `?refresh=true`. Keep `max_workers` at 1–2 to avoid Cloudflare challenges.
+- The endpoint `GET /api/snapshots/{network}/{line}` now pulls station metadata from IDFM open data and overlays VMTR websocket vehicle positions when available—no Navitia or HTML scraping is performed in the hot path.
+- Results are cached in-memory for 60 seconds and exposed to the frontend map view. Each station entry captures the IDFM `stop_id` so live vehicles can be mapped deterministically.
+- You can force a refresh with `?refresh=true`.

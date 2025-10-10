@@ -51,3 +51,4 @@ structlog==24.1.0
 playwright==1.55.0
 beautifulsoup4==4.14.2
 cloudscraper==1.2.71
+websocket-client==1.9.0

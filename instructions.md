@@ -5,7 +5,7 @@
 - Scraper stack:
   - Primary Navitia/PRIM client: `backend/services/scrapers/navitia_scraper.py`
   - HTTP fallback for Cloudflare-protected pages: `backend/services/scrapers/ratp_http.py`
-  - Line snapshot aggregator: `backend/services/scrapers/line_snapshot.py` (`GET /api/snapshots/{network}/{line}`) orchestrates Navitia first, HTTP fallback second, and Playwright only for cookie refresh/manual capture
+  - Line snapshot aggregator: `backend/services/scrapers/line_snapshot.py` (`GET /api/snapshots/{network}/{line}`) now uses IDFM open data plus the VMTR websocket; Playwright/HTTP scrapers are kept for manual probes only
 - Docs & SOP: `backend/SCRAPER_EXPERIMENT.md` (historical notes) & `plan.md` (live map roadmap)
 - Frontend:
   - Live map tab renders snapshot payload via `frontend/src/components/LineLiveMap.tsx`
@@ -17,12 +17,12 @@
 - Dependencies & Playwright browsers already installed (`frontend/`)
 
 ## Goal
-Boost confidence in the live map workflow by keeping Navitia↔HTTP fallback robust, expanding automated coverage, and refining train inference while waiting for official GTFS feeds.
+Boost confidence in the live map workflow by keeping the VMTR websocket/IDFM pipeline robust, expanding automated coverage, and refining train inference while waiting for official GTFS feeds.
 
 ## Suggested Next Tasks
-1. **Grow Playwright coverage:** Add scenarios around Navitia outages/fallbacks, multi-line selectors, and map error states. Prefer `scripts/run_e2e.sh` for deterministic runs.
+1. **Grow Playwright coverage:** Add scenarios around VMTR outages, multi-line selectors, and map error states. Prefer `scripts/run_e2e.sh` for deterministic runs.
 2. **Refine `_infer_trains`:** Handle HH:MM waits, multiple departures per station, and richer confidence scoring. Cover the changes with new unit tests in `backend/tests/`.
-3. **Snapshot caching/persistence:** Evaluate Redis/job queue storage so each map request doesn’t re-scrape the entire line. Monitor Navitia rate limits during stress runs.
+3. **Snapshot caching/persistence:** Evaluate Redis/job queue storage so each map request doesn’t re-run the VMTR session. Monitor websocket stability during stress runs.
 4. **Map UX polish:** Swap the schematic for an actual map (Leaflet/Mapbox), animate markers via `absolute_progress`, and surface fallback indicators when HTTP scrapes kicked in.
 
 ## Reminders

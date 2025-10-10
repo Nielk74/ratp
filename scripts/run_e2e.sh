@@ -123,6 +123,8 @@ run_playwright() {
 }
 
 ensure_env
+export NAVITIA_SCRAPER_MODE="${NAVITIA_SCRAPER_MODE:-mock}"
+export VMTR_SOCKET_ENABLED="${VMTR_SOCKET_ENABLED:-false}"
 trap 'status=$?; stop_processes; if [[ $status -ne 0 ]]; then print_logs; fi; exit $status' INT TERM EXIT
 
 start_backend

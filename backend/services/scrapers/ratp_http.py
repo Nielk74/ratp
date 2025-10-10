@@ -7,6 +7,7 @@ import re
 import time
 import unicodedata
 from dataclasses import dataclass
+import threading
 from typing import Any, Dict, List, Optional
 
 import cloudscraper
@@ -18,6 +19,7 @@ from ..station_data import STATION_FALLBACKS
 from .ratp_playwright import ScrapedDeparture, ScraperResult
 
 BASE_HORAIRES_URL = "https://www.ratp.fr/horaires"
+_PLAYWRIGHT_LOCK = threading.Lock()
 
 
 def _normalize(value: str) -> str:
@@ -38,8 +40,7 @@ class RatpHttpScraper:
     def __init__(self) -> None:
         self._line_id_cache: Dict[str, str] = {}
         self._stop_points_cache: Dict[str, List[_StopPoint]] = {}
-        self._session = None
-        self._session_created = 0.0
+        self._session_state = threading.local()
 
     def fetch_station_board(
         self,
@@ -84,6 +85,8 @@ class RatpHttpScraper:
             "station": station,
             "direction": direction,
             "network": network,
+            "line_id": stop_point.line_id,
+            "stop_place_id": stop_point.stop_place_id,
             "timestamp": time.time(),
             "source": "cloudscraper",
             "final_url": url,
@@ -184,21 +187,32 @@ class RatpHttpScraper:
         referer = self._build_referer(context)
         if referer:
             headers["Referer"] = referer
-        response = session.get(url, params=params, timeout=30, headers=headers or None)
+        response = session.get(url, params=params, timeout=12, headers=headers or None)
         if response.status_code == 403 or "Just a moment" in response.text:
             session = self._ensure_session(force=True, context=context)
             referer = self._build_referer(context)
             if referer:
                 headers["Referer"] = referer
-            response = session.get(url, params=params, timeout=30, headers=headers or None)
+            response = session.get(url, params=params, timeout=12, headers=headers or None)
         return response
 
     def _ensure_session(self, *, force: bool = False, context: Optional[Dict[str, str]] = None):
         now = time.time()
-        if force or self._session is None or (now - self._session_created) > 600:
-            self._session = self._create_session(context=context)
-            self._session_created = now
-        return self._session
+        state = getattr(self._session_state, "value", None)
+        should_create = force
+        if state is None:
+            should_create = True
+        else:
+            session_age = now - state.get("created", 0.0)
+            if session_age > 600:
+                should_create = True
+
+        if should_create:
+            session = self._create_session(context=context)
+            self._session_state.value = {"session": session, "created": now}
+            return session
+
+        return state["session"]
 
     def _create_session(self, context: Optional[Dict[str, str]] = None):
         session = cloudscraper.create_scraper()
@@ -211,24 +225,30 @@ class RatpHttpScraper:
     def _refresh_cookies(self, session, request_context: Optional[Dict[str, str]] = None):
         request_context = request_context or {}
         targets = self._build_navigation_targets(request_context)
-        with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=True)
-            browser_context = browser.new_context()
-            page = browser_context.new_page()
-            try:
-                for target in targets:
-                    try:
-                        page.goto(target, wait_until="domcontentloaded", timeout=60000)
-                        page.wait_for_timeout(2000)
-                    except PlaywrightTimeoutError:
-                        continue
-            except PlaywrightTimeoutError:
-                pass
-            page.wait_for_timeout(2000)
-            cookies = browser_context.cookies()
-            user_agent = page.evaluate("() => navigator.userAgent")
-            browser_context.close()
-            browser.close()
+        cookies: List[Dict[str, Any]] = []
+        user_agent = None
+        with _PLAYWRIGHT_LOCK:
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch(headless=True)
+                browser_context = browser.new_context()
+                page = browser_context.new_page()
+                try:
+                    for target in targets:
+                        try:
+                            page.goto(target, wait_until="domcontentloaded", timeout=60000)
+                            page.wait_for_timeout(2000)
+                        except PlaywrightTimeoutError:
+                            continue
+                except PlaywrightTimeoutError:
+                    pass
+                page.wait_for_timeout(2000)
+                cookies = browser_context.cookies()
+                try:
+                    user_agent = page.evaluate("() => navigator.userAgent")
+                except Exception:  # pylint: disable=broad-except
+                    user_agent = None
+                browser_context.close()
+                browser.close()
 
         jar = RequestsCookieJar()
         for cookie in cookies:

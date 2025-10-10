@@ -39,6 +39,9 @@ class Settings:
     prim_api_url: str = os.getenv("PRIM_API_URL", "https://prim.iledefrance-mobilites.fr/marketplace")
     prim_api_key: str = os.getenv("PRIM_API_KEY", "")  # Get free key at https://prim.iledefrance-mobilites.fr
     community_api_url: str = os.getenv("COMMUNITY_API_URL", "https://api-ratp.pierre-grimaud.fr/v4")
+    navitia_scraper_mode: str = os.getenv("NAVITIA_SCRAPER_MODE", "live")
+    vmtr_socket_url: str = os.getenv("VMTR_SOCKET_URL", "wss://api.vmtr.ratp.fr/socket.io/")
+    vmtr_socket_enabled: bool = os.getenv("VMTR_SOCKET_ENABLED", "False") == "True"
 
     # Rate Limiting
     rate_limit_enabled: bool = os.getenv("RATE_LIMIT_ENABLED", "True") == "True"

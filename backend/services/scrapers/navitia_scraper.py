@@ -1,7 +1,6 @@
 """Navitia-based scraper pulling schedules via the PRIM API."""
 
 from __future__ import annotations
-
 import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
@@ -55,7 +54,22 @@ class NavitiaScraper:
 
     _DIRECTION_MAP = {"A": "outbound", "B": "inbound"}
 
-    def __init__(self, *, api_key: Optional[str] = None) -> None:
+    def __init__(self, *, api_key: Optional[str] = None, mode: Optional[str] = None) -> None:
+        self._mode = (mode or settings.navitia_scraper_mode).lower()
+        self.is_mock = self._mode == "mock"
+        self.is_disabled = self._mode in {"disabled", "off"}
+
+        if self.is_disabled:
+            raise RuntimeError("Navitia scraper disabled by configuration")
+
+        self._line_cache: Dict[tuple[str, str], str] = {}
+        self._stop_area_cache: Dict[str, Dict[str, _StopArea]] = {}
+
+        if self.is_mock:
+            self._session = None
+            self._api_key = ""
+            return
+
         self._api_key = api_key or settings.prim_api_key
         if not self._api_key:
             raise RuntimeError("PRIM_API_KEY is required to use Navitia scraper")
@@ -67,8 +81,6 @@ class NavitiaScraper:
                 "Accept": "application/json",
             }
         )
-        self._line_cache: Dict[tuple[str, str], str] = {}
-        self._stop_area_cache: Dict[str, Dict[str, _StopArea]] = {}
 
     # Public API -----------------------------------------------------------------
 
@@ -80,6 +92,9 @@ class NavitiaScraper:
         station: str,
         direction: str,
     ) -> ScraperResult:
+        if self._mode == "mock":
+            return self._mock_station_board(network=network, line=line, station=station, direction=direction)
+
         normalized_network = network.lower()
         line_code = line.upper()
 
@@ -218,6 +233,53 @@ class NavitiaScraper:
             )
 
         return departures
+
+    # Mock mode helpers ---------------------------------------------------------
+
+    def _mock_station_board(
+        self,
+        *,
+        network: str,
+        line: str,
+        station: str,
+        direction: str,
+    ) -> ScraperResult:
+        base_waits = [2, 5, 9]
+        direction_label = "terminus" if direction.upper() == "A" else "origin"
+        departures: List[ScrapedDeparture] = []
+        now = datetime.now(PARIS_TZ)
+        for idx, minutes in enumerate(base_waits):
+            wait_text = "À quai" if minutes == 0 else f"{minutes} mn"
+            destination = f"{direction.upper()} {line}"
+            departures.append(
+                ScrapedDeparture(
+                    raw_text=f"{wait_text} → {destination}",
+                    destination=destination,
+                    waiting_time=wait_text,
+                    status="mock",
+                    extra={
+                        "mock": True,
+                        "offset": idx,
+                        "generated_at": now.isoformat(),
+                    },
+                )
+            )
+
+        metadata = {
+            "network": network.lower(),
+            "line": line.upper(),
+            "station": station,
+            "direction": direction,
+            "source": "navitia-mock",
+            "timestamp": now.timestamp(),
+            "direction_hint": direction_label,
+        }
+        return ScraperResult(
+            url="mock://navitia",
+            departures=departures,
+            raw_state={"mode": "mock"},
+            metadata=metadata,
+        )
 
     def _format_wait(self, entry: Dict, now: datetime) -> tuple[str, Optional[int]]:
         stop_dt = entry.get("stop_date_time") or {}

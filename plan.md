@@ -464,13 +464,13 @@ Examples:
 7. ✅ Implement Navitia API client with HTTP fallback
 
 ### 🚆 Real-Time Train Position Plan (Updated 2025-10-09)
-- **Current status:** Navitia `line_reports`, `lines`, and `stop_areas` endpoints are live and power the `/api/snapshots` aggregation. GTFS-RT / SIRI vehicle feeds remain locked behind IDFM approval, so no true vehicle positions yet.
+- **Current status:** `/api/snapshots` now relies on IDFM open data for station context and the public VMTR websocket for live vehicle positions when available. GTFS-RT / SIRI feeds remain locked behind IDFM approval and would provide richer telemetry when available.
 - **Required action:** Request activation for SIRI StopMonitoring or GTFS-RT (vehicle_positions/trip_updates) via the PRIM portal. Specify target networks (Metro, RER, Transilien, Tram) and planned usage.
 - **Backend plan once enabled:**
   * Add a `VehiclePositionService` polling authorised feeds, storing snapshots, and enriching the existing `LineSnapshot` payload with real coordinates/mission data.
   * Expose `GET /api/lines/{type}/{code}/vehicles` and include vehicle summaries in `/api/snapshots`.
   * Persist historical vehicle snapshots for reliability metrics and forecasting.
-- **Interim approach:** Continue inferring trains from waiting times and Navitia stop departures; surface fallback metadata to the frontend so users know when data is inferred.
+- **Interim approach:** Use VMTR data wherever exposed; otherwise surface empty departures rather than synthetic waits so the frontend can show true gaps.
 - **Next checkpoint:** Re-test the SIRI/GTFS endpoints after IDFM grants access; then prioritise ingestion + map visualisation updates.
 
 ### This Week

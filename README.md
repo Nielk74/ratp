@@ -13,7 +13,7 @@ Real-time monitoring system for Paris public transport (RATP) with live traffic 
 
 ### ✅ Backend Highlights
 - **Live Traffic Status** sourced from PRIM Navitia (`line_reports`) with caching & rate-limit protection
-- **Snapshot API**: Station boards via Navitia stop areas + Cloudflare-aware HTTP fallback, with metadata to spot inferred data
+- **Snapshot API**: Stations derived from IDFM open-data plus optional VMTR websocket vehicle feeds, with metadata to surface live vs inferred data
 - **Multi-network Line Catalogue** (Metro, RER, Tram, Transilien) enriched with IDFM open-data stations
 - **Discord Webhooks** with confirmation messages and CRUD endpoints
 - **Geolocation & Utilities**: nearest-station search, in-memory cache, typed configuration
@@ -23,7 +23,7 @@ Real-time monitoring system for Paris public transport (RATP) with live traffic 
 
 ### ✅ Frontend Highlights
 - **Network Toggles** to switch between Metro / RER / Tram / Transilien views
-- **Line Details Panel** with ordered station list and inferred train markers (Navitia data with HTTP fallback)
+- **Line Details Panel** with ordered station list and VMTR-driven train markers (falls back to empty data when websocket disabled)
 - **Discord Webhook Manager** page for creating, listing, and deleting alerts
 - **Nearest Stations Widget** with client-side geolocation
 - **Responsive Next.js 14 UI** refreshing data every two minutes
@@ -52,6 +52,8 @@ RATP Live Tracker
 
 ### APIs & Data Sources
 - **PRIM Île-de-France Mobilités (Navitia)** – live traffic bulletins (`line_reports`)
+- **VMTR Websocket** – live vehicle positions for lines with public feeds
+- **IDFM Open Data** – station catalogue (`arrets-lignes`) and line references
 - **Île-de-France Mobilités Open Data** – station catalogue (`arrets-lignes`) and line references
 - **Community RATP API** – legacy fallback (currently offline; kept for compatibility)
 
@@ -147,8 +149,8 @@ npm run lint
 ### Lines
 - `GET /api/lines` – List all networks (metro, rer, tram, transilien)
 - `GET /api/lines?transport_type=metro` – Filter by transport type
-- `GET /api/lines/{type}/{code}` – Detailed line payload (stations + inferred trains via Navitia snapshot)
-- `GET /api/snapshots/{network}/{line}` – Aggregated station boards (Navitia primary, HTTP fallback)
+- `GET /api/lines/{type}/{code}` – Detailed line payload (stations + VMTR-driven train markers when available)
+- `GET /api/snapshots/{network}/{line}` – Aggregated station data (IDFM stations + VMTR vehicles)
 - `GET /api/lines/{type}/{code}/stations` – Raw station feed for integrations
 
 ### Traffic
@@ -239,6 +241,11 @@ CACHE_TTL_STATIONS=86400   # 24 hours
 # Discord
 DISCORD_WEBHOOK_ENABLED=True
 DISCORD_RATE_LIMIT_SECONDS=60
+
+# Scrapers
+NAVITIA_SCRAPER_MODE=mock   # Use 'live' to hit PRIM API, 'mock' for offline tests
+VMTR_SOCKET_ENABLED=False   # Enable socket.io realtime fetch (requires internet)
+VMTR_SOCKET_URL="wss://api.vmtr.ratp.fr/socket.io/"
 
 # CORS
 CORS_ALLOW_ORIGINS="http://localhost:3000,http://localhost:3100"
