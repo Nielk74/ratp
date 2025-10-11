@@ -6,13 +6,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, List, Optional
 
-import pytz
+from zoneinfo import ZoneInfo
 import requests
 
 from ...config import settings
 from .ratp_playwright import ScrapedDeparture, ScraperResult
 
-PARIS_TZ = pytz.timezone("Europe/Paris")
+PARIS_TZ = ZoneInfo("Europe/Paris")
 
 
 def _normalize(value: str) -> str:
@@ -288,8 +288,7 @@ class NavitiaScraper:
             return ("?", None)
 
         try:
-            scheduled = datetime.strptime(date_str, "%Y%m%dT%H%M%S")
-            scheduled = PARIS_TZ.localize(scheduled)
+            scheduled = datetime.strptime(date_str, "%Y%m%dT%H%M%S").replace(tzinfo=PARIS_TZ)
         except ValueError:
             return ("?", None)
 
