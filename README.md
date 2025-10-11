@@ -129,6 +129,7 @@ The frontend will be available at `http://127.0.0.1:8001`
 
 - `./serve.sh` – kills stale `uvicorn`/`next` processes, then starts backend (8000) and a Next.js dev server (first free port from 8001).
 - `./scripts/run_tests.sh` – ensures the backend virtualenv exists, installs pytest if needed, and runs the backend unit test suite.
+- `./scripts/check_m14_bibliotheque.sh` – calls the schedules endpoint for Metro 14 at Bibliothèque François-Mitterrand (direction configurable via `--direction`).
 - `./scripts/run_e2e.sh` – launches the stack, runs Playwright e2e specs, streams progress, and tears everything down (log tails on failure).
 
 ### Running Tests
