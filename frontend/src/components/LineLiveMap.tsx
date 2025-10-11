@@ -19,15 +19,96 @@ function stationSorter(direction: string) {
   };
 }
 
-function formatWait(departures: LineSnapshotStation["departures"]): string {
+function formatDepartureEntry(departures: LineSnapshotStation["departures"]): string | null {
   if (!departures || departures.length === 0) {
-    return "No data";
+    return null;
   }
   const primary = departures[0];
   if (!primary) {
-    return "No data";
+    return null;
   }
-  return primary.waiting_time || primary.status || primary.raw_text || "No data";
+  return primary.waiting_time || primary.status || primary.raw_text || null;
+}
+
+function describeTrainStatus(
+  station: LineSnapshotStation,
+  stations: LineSnapshotStation[],
+  trains: TrainEstimate[]
+): string | null {
+  if (!trains.length || stations.length <= 1) {
+    return null;
+  }
+
+  const totalSegments = Math.max(stations.length - 1, 1);
+  const stationIndex = station.direction_index ?? station.order ?? 0;
+  const stationProgress = totalSegments === 0 ? 0 : stationIndex / totalSegments;
+
+  const sortedTrains = [...trains].sort((a, b) => a.absolute_progress - b.absolute_progress);
+  const epsilon = 0.001;
+  const upcoming = sortedTrains.filter((train) => train.absolute_progress <= stationProgress + epsilon);
+
+  const target = upcoming.length
+    ? upcoming[upcoming.length - 1]
+    : sortedTrains.reduce<TrainEstimate | null>((closest, candidate) => {
+        if (!closest) {
+          return candidate;
+        }
+        const closestDiff = Math.abs(closest.absolute_progress - stationProgress);
+        const candidateDiff = Math.abs(candidate.absolute_progress - stationProgress);
+        return candidateDiff < closestDiff ? candidate : closest;
+      }, null);
+
+  if (!target) {
+    return null;
+  }
+
+  const relative = stationProgress - target.absolute_progress;
+  let label: string;
+
+  if (target.status) {
+    const status = target.status.toLowerCase();
+    if (status === "atdock") {
+      label = "At platform";
+    } else if (status === "approaching") {
+      label = "Approaching";
+    } else if (status === "departed") {
+      label = "Departed";
+    } else {
+      label = relative >= 0 ? "Approaching" : "In transit";
+    }
+  } else if (Math.abs(relative) <= 0.02) {
+    label = "Arriving";
+  } else if (relative >= 0) {
+    label = "Approaching";
+  } else {
+    label = "Departed";
+  }
+
+  const eta = target.eta_to ?? target.eta_from;
+  if (eta == null) {
+    return label;
+  }
+  if (eta <= 0) {
+    return `${label} (due)`;
+  }
+  if (eta === 1) {
+    return `${label} (1 min)`;
+  }
+  return `${label} (${eta} min)`;
+}
+
+function formatWait(
+  station: LineSnapshotStation,
+  stations: LineSnapshotStation[],
+  trains: TrainEstimate[]
+): string {
+  const existing = formatDepartureEntry(station.departures);
+  if (existing) {
+    return existing;
+  }
+
+  const derived = describeTrainStatus(station, stations, trains);
+  return derived ?? "No data";
 }
 
 function directionLabel(direction: string, stations: LineSnapshotStation[]): string {
@@ -151,7 +232,9 @@ export function LineLiveMap({ line, snapshot, loading, error, onRefresh }: LineL
                       <div className="absolute left-[14px] top-2 h-3 w-3 rounded-full bg-primary" />
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-gray-900">{station.name}</span>
-                        <span className="text-xs text-gray-500">{formatWait(station.departures)}</span>
+                        <span className="text-xs text-gray-500">
+                          {formatWait(station, directionStations, trains)}
+                        </span>
                       </div>
                     </li>
                   ))}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import unicodedata
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -11,8 +12,11 @@ import requests
 
 from ...config import settings
 from .ratp_vmtr_socket import RatpVmtrSocketClient
+from .navitia_scraper import NavitiaScraper
+from .ratp_http import RatpHttpScraper
 from ..station_data import STATION_FALLBACKS
 
+logger = logging.getLogger(__name__)
 
 @dataclass
 class StationJob:
@@ -26,6 +30,8 @@ class StationJob:
     order: int
     direction: str
     stop_id: Optional[str]
+    stop_place_id: Optional[str] = None
+    display_name: Optional[str] = None
 
 
 @dataclass
@@ -63,6 +69,7 @@ class TrainEstimate:
     progress: float
     absolute_progress: float
     confidence: str
+    status: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -120,6 +127,10 @@ def _slugify(value: str) -> str:
     while "--" in normalized:
         normalized = normalized.replace("--", "-")
     return normalized.strip("-")
+
+
+def _names_equal(lhs: str, rhs: str) -> bool:
+    return _normalize_name(lhs) == _normalize_name(rhs)
 
 
 class IdfmReferenceClient:
@@ -236,6 +247,18 @@ class LineSnapshotService:
     def __init__(self) -> None:
         self._cache: Dict[Tuple[str, str], _CacheEntry] = {}
         self._reference_client = IdfmReferenceClient()
+        self._navitia_client: Optional[NavitiaScraper] = None
+        try:
+            self._navitia_client = NavitiaScraper()
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("Navitia scraper disabled: %s", exc)
+            self._navitia_client = None
+        self._http_scraper: Optional[RatpHttpScraper] = None
+        try:
+            self._http_scraper = RatpHttpScraper()
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("RATP HTTP scraper disabled: %s", exc)
+            self._http_scraper = None
         self._vmtr_client = (
             RatpVmtrSocketClient(
                 base_url=settings.vmtr_socket_url,
@@ -297,6 +320,8 @@ class LineSnapshotService:
         if vmtr_error:
             errors.append(vmtr_error)
 
+        self._populate_station_departures(sequences, vmtr_trains)
+
         scraped_at = datetime.now(UTC)
         return LineSnapshot(
             scraped_at=scraped_at,
@@ -307,6 +332,15 @@ class LineSnapshotService:
             errors=errors,
         )
 
+    @staticmethod
+    def _canonical_station_name(name: str) -> str:
+        cleaned = name.strip()
+        if "(" in cleaned and cleaned.endswith(")"):
+            base = cleaned.rsplit("(", 1)[0].strip()
+            if base:
+                return base
+        return cleaned
+
     def _build_jobs(
         self,
         network: str,
@@ -315,14 +349,53 @@ class LineSnapshotService:
         stop_lookup: Dict[str, Dict[str, Any]],
         station_limit: Optional[int],
     ) -> List[StationJob]:
-        fallbacks = STATION_FALLBACKS.get(network, {}).get(line)
-        if not fallbacks:
-            return []
+        jobs: List[StationJob] = []
+        stop_points: List[Any] = []
 
+        if self._http_scraper:
+            try:
+                stop_points = self._http_scraper.list_stop_points(network=network, line=line)
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.debug("Failed to list stop points via HTTP scraper for %s %s: %s", network, line, exc)
+                stop_points = []
+
+        if stop_points:
+            if station_limit is not None and station_limit > 0:
+                stop_points = stop_points[:station_limit]
+
+            for index, stop_point in enumerate(stop_points):
+                display_name = getattr(stop_point, "name", "") or ""
+                if not display_name:
+                    continue
+
+                name = self._canonical_station_name(display_name)
+                slug = _slugify(name)
+                stop_info = self._match_stop(stop_lookup, name, slug)
+                stop_id = stop_info.get("stop_id") if stop_info else None
+
+                for direction in ("A", "B"):
+                    jobs.append(
+                        StationJob(
+                            network=network,
+                            line=line,
+                            line_id=line_id,
+                            name=name,
+                            slug=slug,
+                            order=index,
+                            direction=direction,
+                            stop_id=stop_id,
+                            stop_place_id=getattr(stop_point, "stop_place_id", None),
+                            display_name=display_name,
+                        )
+                    )
+
+            if jobs:
+                return jobs
+
+        fallbacks = STATION_FALLBACKS.get(network, {}).get(line, [])
         if station_limit is not None and station_limit > 0:
             fallbacks = fallbacks[:station_limit]
 
-        jobs: List[StationJob] = []
         for index, station in enumerate(fallbacks):
             name = station.get("name") or station.get("slug")
             if not name:
@@ -364,10 +437,65 @@ class LineSnapshotService:
             metadata["stop_id"] = job.stop_id
         if vmtr_stop_ref:
             metadata["stop_place_ref"] = vmtr_stop_ref
+        if job.stop_place_id:
+            metadata["ratp_stop_place_id"] = job.stop_place_id
+        if job.display_name:
+            metadata["display_name"] = job.display_name
+        else:
+            metadata.setdefault("display_name", job.name)
+
+        departures: List[Dict[str, Any]] = []
+        if self._navitia_client:
+            try:
+                board = self._navitia_client.fetch_station_board(
+                    network=job.network,
+                    line=job.line,
+                    station=job.name,
+                    direction=job.direction,
+                )
+                departures = [item.to_dict() for item in board.departures]
+                metadata["navitia_source"] = board.metadata
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.debug(
+                    "Navitia fetch failed for %s %s %s dir %s: %s",
+                    job.network,
+                    job.line,
+                    job.name,
+                    job.direction,
+                    exc,
+                    exc_info=True,
+                )
+                metadata["navitia_error"] = str(exc)
+        elif self._http_scraper:
+            try:
+                board = self._http_scraper.fetch_station_board(
+                    network=job.network,
+                    line=job.line,
+                    station=metadata.get("display_name", job.name),
+                    direction=job.direction,
+                )
+                departures = [item.to_dict() for item in board.departures]
+                metadata["http_source"] = {
+                    "final_url": board.metadata.get("final_url"),
+                    "cloudflare_blocked": board.metadata.get("cloudflare_blocked"),
+                    "line_id": board.metadata.get("line_id"),
+                    "stop_place_id": board.metadata.get("stop_place_id"),
+                }
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.debug(
+                    "HTTP fetch failed for %s %s %s dir %s: %s",
+                    job.network,
+                    job.line,
+                    job.name,
+                    job.direction,
+                    exc,
+                    exc_info=True,
+                )
+                metadata["http_error"] = str(exc)
 
         return StationSnapshot(
             job=job,
-            departures=[],
+            departures=departures,
             metadata=metadata,
         )
 
@@ -468,6 +596,7 @@ class LineSnapshotService:
                         progress=round(segment_progress, 3),
                         absolute_progress=round(absolute_progress, 3),
                         confidence=confidence,
+                        status=vehicle.status,
                     )
                 )
 
@@ -475,6 +604,149 @@ class LineSnapshotService:
             trains[direction].sort(key=lambda train: train.absolute_progress)
 
         return trains, None
+
+    def _populate_station_departures(
+        self,
+        sequences: Dict[str, List[StationSnapshot]],
+        trains: Dict[str, List[TrainEstimate]],
+    ) -> None:
+        for direction, stations in sequences.items():
+            if not stations:
+                continue
+
+            direction_trains = trains.get(direction) or []
+            if not direction_trains:
+                continue
+
+            total_segments = max(len(stations) - 1, 1)
+            name_to_index = {
+                _normalize_name(snapshot.job.name): snapshot.direction_index or idx
+                for idx, snapshot in enumerate(stations)
+            }
+
+            for snapshot in stations:
+                if snapshot.departures:
+                    continue
+
+                station_index = snapshot.direction_index
+                if station_index is None:
+                    station_index = name_to_index.get(_normalize_name(snapshot.job.name), 0)
+
+                station_progress = station_index / total_segments if total_segments else 0.0
+
+                upcoming = [
+                    train
+                    for train in direction_trains
+                    if train.absolute_progress <= station_progress + 1e-6
+                ]
+
+                if upcoming:
+                    target_train = max(upcoming, key=lambda train: train.absolute_progress)
+                else:
+                    target_train = min(
+                        direction_trains,
+                        key=lambda train: abs(train.absolute_progress - station_progress),
+                        default=None,
+                    )
+
+                if not target_train:
+                    continue
+
+                entry = self._build_departure_entry(
+                    snapshot=snapshot,
+                    train=target_train,
+                    station_index=station_index,
+                    station_progress=station_progress,
+                    name_to_index=name_to_index,
+                )
+                if entry:
+                    snapshot.departures.append(entry)
+
+    def _build_departure_entry(
+        self,
+        snapshot: StationSnapshot,
+        train: TrainEstimate,
+        station_index: int,
+        station_progress: float,
+        name_to_index: Dict[str, int],
+    ) -> Optional[Dict[str, Any]]:
+        from_index = name_to_index.get(_normalize_name(train.from_station))
+        to_index = name_to_index.get(_normalize_name(train.to_station))
+
+        if to_index is None and _names_equal(train.to_station, snapshot.job.name):
+            to_index = station_index
+        if from_index is None and _names_equal(train.from_station, snapshot.job.name):
+            from_index = station_index
+
+        label, eta = self._describe_train_state(
+            station_index=station_index,
+            station_progress=station_progress,
+            train=train,
+            from_index=from_index,
+            to_index=to_index,
+        )
+
+        if not label:
+            return None
+
+        waiting_time = self._format_waiting_time(label, eta)
+        destination = train.to_station or snapshot.job.name
+        raw_text = f"{train.from_station} → {train.to_station}"
+
+        extra: Dict[str, Any] = {
+            "train_direction": train.direction,
+            "confidence": train.confidence,
+            "absolute_progress": train.absolute_progress,
+            "progress_between_stops": train.progress,
+        }
+        if from_index is not None:
+            extra["from_index"] = from_index
+        if to_index is not None:
+            extra["to_index"] = to_index
+        if train.status:
+            extra["status"] = train.status
+
+        return {
+            "destination": destination,
+            "waiting_time": waiting_time,
+            "status": label,
+            "raw_text": raw_text,
+            "extra": extra,
+        }
+
+    @staticmethod
+    def _describe_train_state(
+        *,
+        station_index: int,
+        station_progress: float,
+        train: TrainEstimate,
+        from_index: Optional[int],
+        to_index: Optional[int],
+    ) -> Tuple[str, Optional[int]]:
+        if to_index is not None and station_index == to_index:
+            return "Arriving", train.eta_to
+
+        if from_index is not None and station_index == from_index:
+            return "Departing", train.eta_from
+
+        if train.absolute_progress <= station_progress + 1e-3:
+            return "Approaching", train.eta_to
+
+        return "Departed", None
+
+    @staticmethod
+    def _format_waiting_time(label: str, eta: Optional[int]) -> str:
+        if eta is None:
+            return label
+
+        if eta <= 0:
+            suffix = "due"
+        elif eta == 1:
+            suffix = "1 min"
+        else:
+            suffix = f"{eta} min"
+
+        return f"{label} ({suffix})"
 
     @staticmethod
     def _map_vmtr_direction(direction: str) -> str:

@@ -140,6 +140,7 @@ export interface TrainEstimate {
   progress: number;
   absolute_progress: number;
   confidence: "high" | "medium" | "low";
+  status?: string | null;
 }
 
 export interface LineSnapshot {
