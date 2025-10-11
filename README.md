@@ -12,7 +12,7 @@ Real-time monitoring system for Paris public transport (RATP) with live traffic 
 ## 🎯 Features
 
 ### ✅ Backend Highlights
-- **Live Traffic Status** sourced from PRIM Navitia (`line_reports`) with caching & rate-limit protection
+- **Live Traffic Status** scraped from ratp.fr traffic endpoints via an emulated browser session with caching
 - **Snapshot API**: Stations derived from IDFM open-data plus optional VMTR websocket vehicle feeds, with metadata to surface live vs inferred data
 - **Multi-network Line Catalogue** (Metro, RER, Tram, Transilien) enriched with IDFM open-data stations
 - **Discord Webhooks** with confirmation messages and CRUD endpoints
@@ -51,11 +51,12 @@ RATP Live Tracker
 ```
 
 ### APIs & Data Sources
-- **PRIM Île-de-France Mobilités (Navitia)** – live traffic bulletins (`line_reports`)
+- **ratp.fr traffic endpoints** – official public site scraped with shared session cookies
 - **VMTR Websocket** – live vehicle positions for lines with public feeds
 - **IDFM Open Data** – station catalogue (`arrets-lignes`) and line references
 - **Île-de-France Mobilités Open Data** – station catalogue (`arrets-lignes`) and line references
-- **Community RATP API** – legacy fallback (currently offline; kept for compatibility)
+- **PRIM Navitia** – optional departures feed (requires API key, disabled by default)
+- **Community RATP API** – legacy fallback (currently unreliable)
 
 ---
 
@@ -89,7 +90,7 @@ pip install -r requirements.txt
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your API keys (PRIM_API_KEY is optional)
+# Edit .env with your API keys (PRIM_API_KEY only required for optional Navitia features)
 
 # Run the server
 PYTHONPATH="$(pwd)/.." uvicorn backend.main:app --host 127.0.0.1 --port 8000
@@ -195,7 +196,7 @@ For full-stack + Playwright validation run `./scripts/run_e2e.sh` from the repo 
 ratp/
 ├── backend/
 │   ├── api/             # FastAPI routers (lines, traffic, schedules, geo, webhooks)
-│   ├── services/        # Integrations (PRIM, IDFM open data, Discord, cache)
+│   ├── services/        # Integrations (ratp.fr traffic, IDFM open data, Discord, cache)
 │   ├── models/          # SQLAlchemy models & mixins
 │   ├── tests/           # pytest suite (48 tests)
 │   └── main.py          # Application entry point
@@ -230,7 +231,7 @@ PORT=8000
 DATABASE_URL="sqlite+aiosqlite:///./ratp.db"
 
 # RATP / IDFM APIs
-PRIM_API_KEY=""  # Required for PRIM Navitia traffic feed
+PRIM_API_KEY=""  # Optional: Navitia departures fallback (disable by default)
 COMMUNITY_API_URL="https://api-ratp.pierre-grimaud.fr/v4"
 
 # Caching
@@ -243,7 +244,7 @@ DISCORD_WEBHOOK_ENABLED=True
 DISCORD_RATE_LIMIT_SECONDS=60
 
 # Scrapers
-NAVITIA_SCRAPER_MODE=mock   # Use 'live' to hit PRIM API, 'mock' for offline tests
+NAVITIA_SCRAPER_MODE=mock   # Use 'live' to hit Navitia (requires PRIM_API_KEY), 'mock' for offline tests
 VMTR_SOCKET_ENABLED=False   # Enable socket.io realtime fetch (requires internet)
 VMTR_SOCKET_URL="wss://api.vmtr.ratp.fr/socket.io/"
 
@@ -260,7 +261,7 @@ See [plan.md](plan.md) for detailed roadmap.
 ### Phase 1: Backend Foundation ✅ (COMPLETED)
 - [x] FastAPI setup
 - [x] Database models (SQLite)
-- [x] PRIM Navitia client with rate limiting
+- [x] ratp.fr traffic scraper with caching
 - [x] REST endpoints (lines, traffic, schedules*, geo, webhooks)
 - [x] Discord webhooks service
 - [x] Geolocation service

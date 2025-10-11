@@ -113,19 +113,19 @@
 ```json
 {
   "status": "ok",
-  "source": "prim_api",
+  "source": "ratp_site",
   "lines": [
     {
       "line_code": "1",
       "level": "warning",
       "message": "Minor delays",
-      "source": "prim"
+      "source": "ratp_site"
     }
   ]
 }
 ```
 **Status:** ✅ PASS
-**Note:** Uses PRIM `line_reports`, cached for 120 seconds
+**Note:** Uses ratp.fr traffic messages via HTTP scraper, cached for 120 seconds
 
 ---
 

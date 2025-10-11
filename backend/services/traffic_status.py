@@ -119,10 +119,11 @@ class TrafficStatusService:
                     }
 
         # Fill remaining lines as unknown
+        source = (traffic_payload.get("source") or "").lower()
         default_level = (
             "normal"
             if traffic_payload.get("status") == "ok"
-            and traffic_payload.get("source") == "prim_api"
+            and source in {"prim_api", "ratp_site", "community_api"}
             else "unknown"
         )
         default_message = (

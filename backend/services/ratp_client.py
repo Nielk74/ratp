@@ -2,12 +2,13 @@
 
 import httpx
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 import asyncio
 import math
 from ..config import settings
 from .cache_service import CacheService
 from .station_data import STATION_FALLBACKS
+from .scrapers.ratp_traffic import RatpTrafficScraper
 
 
 class RateLimitExceeded(Exception):
@@ -16,13 +17,12 @@ class RateLimitExceeded(Exception):
 
 
 class RatpClient:
-    """Client for interacting with RATP APIs (PRIM and Community)."""
+    """Client for interacting with RATP sources (ratp.fr scraper and community API)."""
 
     def __init__(self):
-        self.prim_url = settings.prim_api_url
-        self.prim_key = settings.prim_api_key
         self.community_url = settings.community_api_url
         self.cache = CacheService()
+        self._traffic_scraper = RatpTrafficScraper()
 
         self._line_catalog: List[Dict[str, Any]] = [
             # Metro lines
@@ -61,26 +61,6 @@ class RatpClient:
             {"code": "P", "name": "Transilien P", "type": "transilien", "color": "#F1921D"},
             {"code": "U", "name": "Transilien U", "type": "transilien", "color": "#5C2D91"},
         ]
-
-        # Rate limiting counters
-        self._prim_traffic_count = 0
-        self._prim_departures_count = 0
-        self._last_reset = datetime.now()
-
-    def _check_rate_limit(self, endpoint_type: str) -> None:
-        """Check if rate limit has been exceeded."""
-        # Reset counters daily
-        if datetime.now() - self._last_reset > timedelta(days=1):
-            self._prim_traffic_count = 0
-            self._prim_departures_count = 0
-            self._last_reset = datetime.now()
-
-        if endpoint_type == "traffic":
-            if self._prim_traffic_count >= settings.rate_limit_prim_traffic_per_day:
-                raise RateLimitExceeded("PRIM traffic API rate limit exceeded")
-        elif endpoint_type == "departures":
-            if self._prim_departures_count >= settings.rate_limit_prim_departures_per_day:
-                raise RateLimitExceeded("PRIM departures API rate limit exceeded")
 
     async def _fetch_with_retry(
         self,
@@ -167,7 +147,7 @@ class RatpClient:
 
     async def get_traffic_info(self, line_code: Optional[str] = None) -> Dict[str, Any]:
         """
-        Get traffic information for all lines or a specific line using PRIM API.
+        Get traffic information for all lines or a specific line using the public site.
 
         Args:
             line_code: Optional line code to filter (e.g., "1", "A", "T3a")
@@ -182,64 +162,37 @@ class RatpClient:
         if cached:
             return cached
 
-        # Try PRIM API (official Île-de-France Mobilités API)
-        if self.prim_key:
-            try:
-                self._check_rate_limit("traffic")
+        traffic_result: Dict[str, List[Dict[str, Any]]] = {}
+        scraper_errors: List[str] = []
+        try:
+            traffic_result, scraper_errors = self._traffic_scraper.fetch_status(line_code=line_code)
+        except Exception as exc:  # pylint: disable=broad-except
+            scraper_errors = [f"ratp_site: {exc}"]
+            traffic_result = {}
 
-                # PRIM API endpoint for traffic info
-                url = f"{self.prim_url}/v2/navitia/line_reports"
-                headers = {
-                    "apiKey": self.prim_key,
-                    "Accept": "application/json"
-                }
+        if traffic_result:
+            result = {
+                "status": "ok",
+                "message": "Traffic data from ratp.fr",
+                "source": "ratp_site",
+                "timestamp": datetime.now().isoformat(),
+                "result": traffic_result,
+            }
+            if scraper_errors:
+                result["errors"] = scraper_errors
+            await self.cache.set(cache_key, result, ttl=settings.cache_ttl_traffic)
+            return result
 
-                # Add line filter if specified
-                params = {"count": 100}
-
-                params = {"count": 100}
-                if line_code:
-                    params["q"] = line_code
-
-                data = await self._fetch_with_retry(
-                    url,
-                    headers=headers,
-                    params=params,
-                    timeout=10,
-                )
-                self._prim_traffic_count += 1
-
-                # Transform PRIM response to our format
-                result = {
-                    "status": "ok",
-                    "message": "Traffic data from PRIM API",
-                    "source": "prim_api",
-                    "timestamp": datetime.now().isoformat(),
-                    "data": data
-                }
-
-                # Filter by line if specified
-                if line_code and "line_reports" in data:
-                    result["data"]["line_reports"] = [
-                        report for report in data.get("line_reports", [])
-                        if line_code in report.get("line", {}).get("code", "")
-                    ]
-
-                # Cache the result
-                await self.cache.set(cache_key, result, ttl=settings.cache_ttl_traffic)
-                return result
-
-            except RateLimitExceeded as e:
-                return {
-                    "status": "rate_limited",
-                    "message": "PRIM API rate limit exceeded. Please try again later.",
-                    "error": str(e),
-                    "source": "prim_api",
-                    "timestamp": datetime.now().isoformat()
-                }
-            except Exception as e:
-                # Log PRIM API error but continue to try community API
-                print(f"PRIM API error: {str(e)}")
+        if not scraper_errors:
+            result = {
+                "status": "ok",
+                "message": "No traffic alerts for the requested scope",
+                "source": "ratp_site",
+                "timestamp": datetime.now().isoformat(),
+                "result": traffic_result,
+            }
+            await self.cache.set(cache_key, result, ttl=settings.cache_ttl_traffic)
+            return result
 
         # Try community API as fallback
         try:
@@ -256,15 +209,21 @@ class RatpClient:
 
             # Cache the result
             await self.cache.set(cache_key, data, ttl=settings.cache_ttl_traffic)
+            if scraper_errors and isinstance(data, dict):
+                existing_errors = data.get("errors")
+                if isinstance(existing_errors, list):
+                    data["errors"] = existing_errors + scraper_errors
+                else:
+                    data["errors"] = scraper_errors
+            if isinstance(data, dict):
+                data.setdefault("source", "community_api")
             return data
 
         except Exception as e:
             # Return informative message about API key requirement
-            message = "Unable to fetch real-time traffic data."
-            if not self.prim_key:
-                message += " Please configure PRIM_API_KEY environment variable. Get your free API key at: https://prim.iledefrance-mobilites.fr"
-            else:
-                message += " Both PRIM and community APIs are currently unavailable."
+            message = "Unable to fetch real-time traffic data from ratp.fr or the community API."
+            if scraper_errors:
+                message += f" Errors: {'; '.join(scraper_errors)}"
 
             fallback = {
                 "status": "unavailable",
@@ -273,9 +232,9 @@ class RatpClient:
                 "source": "no_api_available",
                 "timestamp": datetime.now().isoformat(),
                 "help": {
-                    "prim_api_configured": bool(self.prim_key),
-                    "instructions": "To enable real-time traffic data, get a free API key from https://prim.iledefrance-mobilites.fr and set PRIM_API_KEY environment variable."
-                }
+                    "ratp_http_available": False,
+                    "instructions": "The scraper emulates the ratp.fr traffic pages. Ensure cloudscraper and Playwright dependencies are installed.",
+                },
             }
             # Cache fallback for short time
             await self.cache.set(cache_key, fallback, ttl=30)

@@ -36,7 +36,6 @@ class Settings:
     cache_ttl_stations: int = int(os.getenv("CACHE_TTL_STATIONS", "86400"))
 
     # RATP APIs
-    prim_api_url: str = os.getenv("PRIM_API_URL", "https://prim.iledefrance-mobilites.fr/marketplace")
     prim_api_key: str = os.getenv("PRIM_API_KEY", "")  # Get free key at https://prim.iledefrance-mobilites.fr
     community_api_url: str = os.getenv("COMMUNITY_API_URL", "https://api-ratp.pierre-grimaud.fr/v4")
     navitia_scraper_mode: str = os.getenv("NAVITIA_SCRAPER_MODE", "live")
@@ -46,8 +45,6 @@ class Settings:
     # Rate Limiting
     rate_limit_enabled: bool = os.getenv("RATE_LIMIT_ENABLED", "True") == "True"
     rate_limit_per_minute: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "100"))
-    rate_limit_prim_traffic_per_day: int = int(os.getenv("RATE_LIMIT_PRIM_TRAFFIC_PER_DAY", "20000"))
-    rate_limit_prim_departures_per_day: int = int(os.getenv("RATE_LIMIT_PRIM_DEPARTURES_PER_DAY", "1000"))
 
     # CORS
     cors_origins: List[str] = [

@@ -25,14 +25,14 @@
 1. **API Surface**
    - `/api/lines` – network catalogue with optional type filter
    - `/api/lines/{type}/{code}` – detailed line payload (stations + inferred trains)
-   - `/api/snapshots/{network}/{line}` – Navitia-backed station boards with fallback metadata
-   - `/api/traffic/status` – normalised traffic severity map (PRIM `line_reports`)
+   - `/api/snapshots/{network}/{line}` – station boards built from ratp.fr schedules with VMTR enrichment
+   - `/api/traffic/status` – normalised traffic severity map sourced from ratp.fr traffic messages
    - `/api/webhooks` – Discord subscription CRUD + confirmation pings
    - `/api/geo/nearest` – geolocation search
    - `/api/schedules` – legacy passthrough (awaiting official feed restoration)
 
 2. **Services**
-   - Navitia client (primary) with per-request caching & rate limiting
+   - ratp.fr session manager for traffic + schedules with caching & Cloudflare handling
    - Cloudflare-aware HTTP fallback + Playwright cookie seeding for `/horaires`
    - IDFM open-data enrichment, Discord webhook dispatcher, geolocation utilities
 
@@ -118,7 +118,7 @@ cd backend
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env  # set PRIM_API_KEY + optional overrides
+cp .env.example .env  # configure optional overrides (PRIM_API_KEY only for Navitia experiments)
 PYTHONPATH="$(pwd)/.." uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 API docs: http://127.0.0.1:8000/docs (health: `/health`)
@@ -171,7 +171,7 @@ vercel --prod
 APP_NAME="RATP Live Tracker"
 ENVIRONMENT="production"
 DATABASE_URL="sqlite+aiosqlite:///./ratp.db"
-PRIM_API_KEY=""  # Optional
+PRIM_API_KEY=""  # Optional: Navitia departures fallback (disabled by default)
 # Allow multiple origins (comma-separated) e.g. http://localhost:3100,http://xps:3100
 CORS_ALLOW_ORIGINS="http://localhost:3000,http://localhost:3100"
 ```
@@ -299,7 +299,7 @@ Once deployed, access interactive API documentation:
 - **Documentation**: See `plan.md` for architecture details
 - **API Reference**: http://localhost:8000/docs (when running)
 - **RATP Data Source**: https://data.ratp.fr/
-- **PRIM Platform**: https://prim.iledefrance-mobilites.fr/
+- **ratp.fr traffic**: https://www.ratp.fr/infos-trafic
 
 ---
 

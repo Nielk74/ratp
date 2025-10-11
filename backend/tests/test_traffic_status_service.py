@@ -68,3 +68,24 @@ def test_normalise_uses_community_when_no_prim():
     assert line["line_code"] == "2"
     assert line["level"] == "disrupted"
     assert line["source"] == "community"
+
+
+def test_normalise_handles_ratp_site_source():
+    service = TrafficStatusService()
+    payload = {
+        "status": "ok",
+        "source": "ratp_site",
+        "result": {
+            "metros": [
+                {
+                    "line": "3",
+                    "slug": "normal",
+                    "message": "Trafic normal",
+                }
+            ]
+        },
+    }
+
+    normalised = service.normalise(payload)
+    assert normalised["default"]["level"] == "normal"
+    assert normalised["lines"][0]["source"] == "community"

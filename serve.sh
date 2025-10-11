@@ -5,9 +5,9 @@ ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 kill_port() {
   local port="$1"
-  if lsof -ti ":${port}" >/dev/null 2>&1; then
+  if fuser -s "${port}/tcp"; then
     echo "[serve] killing processes on port ${port}"
-    lsof -ti ":${port}" | xargs -r kill -9
+    fuser -k "${port}/tcp" >/dev/null 2>&1 || true
   fi
 }
 

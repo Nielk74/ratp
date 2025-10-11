@@ -3,7 +3,8 @@
 ## Context
 - Repository root: `/home/antoine/projects/ratp`
 - Scraper stack:
-  - Primary Navitia/PRIM client: `backend/services/scrapers/navitia_scraper.py`
+  - Traffic comes from the ratp.fr HTTP scraper: `backend/services/scrapers/ratp_traffic.py` (shares cookies with `ratp_http`)
+  - Optional Navitia/PRIM client for departures: `backend/services/scrapers/navitia_scraper.py`
   - HTTP fallback for Cloudflare-protected pages: `backend/services/scrapers/ratp_http.py`
   - Line snapshot aggregator: `backend/services/scrapers/line_snapshot.py` (`GET /api/snapshots/{network}/{line}`) now uses IDFM open data plus the VMTR websocket; Playwright/HTTP scrapers are kept for manual probes only
 - Docs & SOP: `backend/SCRAPER_EXPERIMENT.md` (historical notes) & `plan.md` (live map roadmap)

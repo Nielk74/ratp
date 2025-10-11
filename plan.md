@@ -8,7 +8,7 @@
 
 ## 📋 Executive Summary
 
-RATP Live Tracker is a modern, real-time monitoring system for Paris public transport. It provides live traffic updates, incident alerts, geolocation-based stop suggestions, and predictive forecasting using RATP and PRIM APIs.
+RATP Live Tracker is a modern, real-time monitoring system for Paris public transport. It provides live traffic updates, incident alerts, geolocation-based stop suggestions, and predictive forecasting using ratp.fr session data, IDFM open datasets, and optional PRIM feeds.
 
 ---
 
@@ -57,7 +57,7 @@ RATP Live Tracker is a modern, real-time monitoring system for Paris public tran
 
 #### 1. **Backend (FastAPI + Python)**
 - **API Routes**: REST endpoints (`/api/lines`, `/api/traffic`, `/api/snapshots`, `/api/geo`, `/api/webhooks`)
-- **Scraper Services**: Navitia/PRIM client plus Cloudflare-aware HTTP fallback (Playwright reserved for cookie refreshing/manual capture)
+- **Scraper Services**: ratp.fr traffic scraper + Cloudflare-aware HTTP schedule fetcher (Playwright reserved for cookie refreshing/manual capture); Navitia remains optional for experiments
 - **Persistence**: SQLAlchemy + SQLite (migration path to Postgres when long-term storage expands)
 - **Caching & Settings**: Snapshot cache with TTL, Pydantic settings, fallback metadata for observability
 - **Testing**: Pytest suite (~48 tests) covering clients, services, and routers
@@ -99,7 +99,7 @@ RATP Live Tracker is a modern, real-time monitoring system for Paris public tran
 **Priority:** HIGH
 
 ### 📅 Phase 2: Core Features
-- [x] Traffic incident ingestion via PRIM Navitia (`line_reports`)
+- [x] Traffic incident ingestion via ratp.fr traffic endpoints (Cloudflare-aware scraper)
 - [x] Geolocation service for nearest stops
 - [x] Discord webhook CRUD + confirmation pings
 - [ ] Persist snapshot history & expose analytics endpoints
@@ -203,16 +203,22 @@ RATP Live Tracker is a modern, real-time monitoring system for Paris public tran
 
 ## 📡 API Integration Details
 
-### PRIM Île-de-France Mobilités API
-**Base URL:** `https://prim.iledefrance-mobilites.fr/`
-**Authentication:** API Key (register at PRIM portal)
-**Rate Limits:**
-- Traffic Info: 20,000 requests/day
-- Next Departures: 1,000 requests/day
-- Messages: 20,000 requests/day
+### ratp.fr Traffic Endpoints
+**Base URL:** `https://www.ratp.fr/api/traffic`
+**Authentication:** Browser session cookies (Cloudflare protected)
+**Access Strategy:**
+- Playwright-assisted cookie seeding shared with the schedule scraper
+- `cloudscraper` session reused for both traffic and timetable AJAX calls
+- Responses mirror the community API structure (`metros`, `rers`, `tramways`, `trains`)
 
-**Key Endpoints:**
-- `GET /traffic` - Real-time traffic incidents by line/mode
+### PRIM Île-de-France Mobilités API _(optional)_
+**Base URL:** `https://prim.iledefrance-mobilites.fr/`
+**Authentication:** API Key (register at PRIM portal; no longer required for core traffic)
+**Usage Today:**
+- Experimental Navitia departures enrichment when a key is available
+- Future SIRI StopMonitoring / GTFS-RT ingestion once access is granted
+
+**Key Endpoints (when enabled):**
 - `GET /next_departures` - Real-time schedules (updated every minute)
 - `GET /messages` - Information messages displayed on screens
 
@@ -418,7 +424,7 @@ services:
 
 ## 🔐 Security Considerations
 
-1. **API Key Protection:** Store PRIM API keys in environment variables
+1. **API Key Protection:** Store optional partner API keys (PRIM / Navitia) in environment variables
 2. **Rate Limiting:** Implement per-IP rate limits (100 req/min)
 3. **Input Validation:** Pydantic schemas for all inputs
 4. **SQL Injection:** Use parameterized queries (SQLAlchemy ORM)

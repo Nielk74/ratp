@@ -8,19 +8,44 @@
 
 ## Executive Summary
 
-After extensive research and testing, **only the PRIM API (Île-de-France Mobilités)** provides working real-time traffic data. The community RATP API remains down, while Île-de-France Mobilités open data offers reliable station catalogues but no live vehicle feeds.
+Initial testing showed that **only the PRIM API (Île-de-France Mobilités)** exposed a stable programmatic traffic feed; the community RATP API timed out and open data only covered static catalogues. Since then we have implemented a ratp.fr session-based scraper that reuses Playwright cookies to call the public `api/traffic` endpoints, eliminating the runtime dependency on PRIM for traffic.
 
-**Update (2025-10-09):** Navitia `line_reports`, `lines`, and `stop_areas` endpoints are now integrated in production; community and SIRI feeds remain pending. Use this document for historical testing notes and future feed activation steps.
+**Update (2025-10-09):** Navitia `line_reports`, `lines`, and `stop_areas` endpoints are integrated for optional departures enrichment.
+**Update (2025-10-10):** RatpTrafficScraper now emulates the ratp.fr site for traffic; PRIM remains optional for future SIRI/GTFS access.
 
 ### Recommendations
 
-1. ✅ **Use PRIM API** - Official, free, reliable real-time traffic data
-2. ❌ **Avoid community API** - Currently unreachable (timeout)
-3. ⚠️ **RATP Open Data** - Good for historical data, not real-time traffic
+1. ✅ **Use the ratp.fr scraper** - Emulate the public site via shared cookies for traffic data (current default)
+2. ✅ **Keep PRIM API optional** - Official, reliable, but no longer mandatory for traffic
+3. ❌ **Avoid community API** - Currently unreachable (timeout)
+4. ⚠️ **RATP Open Data** - Good for historical data, not real-time traffic
 
 ---
 
 ## API Testing Results
+
+### 0. ratp.fr Traffic Endpoint ✅ SUCCESS
+
+**URL**: `https://www.ratp.fr/api/traffic/{network}`
+**Status**: **WORKING** (requires Cloudflare session cookies)
+
+#### Approach
+
+```text
+1. Launch headless Playwright (already used by the HTTP schedule scraper)
+2. Collect Cloudflare clearance + consent cookies for https://www.ratp.fr
+3. Reuse the shared cloudscraper session to query:
+   - /api/traffic/metros
+   - /api/traffic/rers
+   - /api/traffic/tramways
+   - /api/traffic/trains
+4. Normalise the payload to the community structure (metros/rers/tramways/trains)
+```
+
+#### Notes
+- Works without API keys; only requires the existing cookie bootstrapper.
+- Provides the same fields (`line`, `slug`, `title`, `message`) that the community API exposed, so downstream consumers remain unchanged.
+- Falls back to the legacy community API if Cloudflare blocks automated requests.
 
 ### 1. Community RATP API ❌ FAILED
 
@@ -393,28 +418,26 @@ curl "https://prim.iledefrance-mobilites.fr/fr/apis"
 
 ### Long-term Strategy
 
-1. **Primary**: PRIM API (official, reliable, real-time)
-2. **Secondary**: Community API if it comes back online
-3. **Fallback**: Clear error message with setup instructions
+1. **Primary**: ratp.fr traffic scraper (emulated browser session)
+2. **Secondary**: Optional PRIM API (Navitia/SIRI) when keys are available
+3. **Fallback**: Community API if it comes back online, otherwise clear error message
 
 ### Monitoring
 
-- Track PRIM API rate limit usage
-- Log API errors for debugging
-- Cache responses to minimize API calls (2min TTL for traffic)
-- Monitor API status page: https://prim.iledefrance-mobilites.fr
+- Monitor Cloudflare challenge frequency and rotate cookies when blocked
+- Log scraper errors for debugging
+- Cache responses to minimize API calls (2 min TTL for traffic)
+- Track PRIM API rate limit usage only when Navitia mode is enabled
 
 ---
 
 ## Conclusion
 
-The community RATP API (`api-ratp.pierre-grimaud.fr`) is **completely unreachable** and cannot be used for production. The official RATP Open Data portal provides excellent historical data but **no real-time traffic status**.
+The community RATP API (`api-ratp.pierre-grimaud.fr`) remains **unreachable** and cannot be relied upon. The public ratp.fr website, however, can be automated with the existing Cloudflare-aware session bootstrapper, giving us a keyless first-party traffic feed. PRIM stays in the toolbox for richer datasets (Navitia, SIRI, GTFS-RT) but is no longer required for the core workflow.
 
-The **PRIM API** from Île-de-France Mobilités is the **only working solution** for real-time traffic data. It's official, free, reliable, and well-documented. Users must register for a free API key to access it.
-
-**Status**: ✅ Traffic + station data implemented; 🚧 train positions awaiting feed activation
-**Next Step**: Request IDFM real-time vehicle feed activation via PRIM portal
-**Documentation**: See `PRIM_API_SETUP.md` and `plan.md` (Real-Time Train Position Plan)
+**Status**: ✅ Traffic + station data implemented via ratp.fr; 🚧 train positions awaiting VMTR + SIRI alignment  
+**Next Step**: Keep refining the ratp.fr scraper resilience and pursue IDFM access for official realtime telemetry  
+**Documentation**: See `plan.md` (Real-Time Train Position Plan) and this report for historical context
 
 ---
 

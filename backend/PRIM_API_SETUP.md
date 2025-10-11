@@ -1,13 +1,15 @@
 # PRIM API Setup Guide
 
+> ⚠️ **Deprecated for core traffic** – The backend now scrapes ratp.fr directly for live traffic. Keep this guide only if you plan to enable optional Navitia/SIRI features that still require a PRIM API key.
+
 ## Why PRIM API?
 
-The community RATP API (`api-ratp.pierre-grimaud.fr`) is currently **unavailable/timing out**. To get **real-time traffic data**, you need to use the **official PRIM API** from Île-de-France Mobilités.
+The backend now covers live traffic by emulating the public ratp.fr site, so a PRIM key is **not required** for day-to-day usage. You may still want access to the official PRIM marketplace if you plan to experiment with Navitia departures, SIRI StopMonitoring, or GTFS-RT feeds once they become available.
 
 ## Benefits of PRIM API
 
 ✅ **Official API** from Île-de-France Mobilités
-✅ **Real-time traffic information** for all Paris transport lines
+✅ **Official real-time data** for Paris transport lines (useful for Navitia/SIRI experiments)
 ✅ **Free** with generous quota (20,000 requests/day)
 ✅ **Reliable** and maintained by IDFM
 ✅ **Comprehensive data** including incidents, disruptions, planned works

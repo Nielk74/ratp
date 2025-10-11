@@ -146,6 +146,16 @@ class RatpHttpScraper:
                 return candidate
         return None
 
+    def list_stop_points(
+        self,
+        network: str,
+        line: str,
+        *,
+        context: Optional[Dict[str, str]] = None,
+    ) -> List[_StopPoint]:
+        """Expose ordered stop points for the requested line."""
+        return list(self._fetch_stop_points(network, line, context=context))
+
     def _parse_departures(self, block) -> List[ScrapedDeparture]:
         departures: List[ScrapedDeparture] = []
         if not block:
@@ -302,6 +312,15 @@ class RatpHttpScraper:
             seen.add(key)
             ordered.append(candidate)
         return ordered
+
+    def get_session(
+        self,
+        *,
+        context: Optional[Dict[str, str]] = None,
+        force: bool = False,
+    ):
+        """Expose the underlying cloudscraper session for sibling scrapers."""
+        return self._ensure_session(force=force, context=context)
 
     @staticmethod
     def _station_slug(value: str) -> str:
