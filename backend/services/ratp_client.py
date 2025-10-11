@@ -2,7 +2,7 @@
 
 import httpx
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import asyncio
 import math
 from ..config import settings
@@ -165,7 +165,10 @@ class RatpClient:
         traffic_result: Dict[str, List[Dict[str, Any]]] = {}
         scraper_errors: List[str] = []
         try:
-            traffic_result, scraper_errors = self._traffic_scraper.fetch_status(line_code=line_code)
+            traffic_result, scraper_errors = await asyncio.to_thread(
+                self._traffic_scraper.fetch_status,
+                line_code=line_code,
+            )
         except Exception as exc:  # pylint: disable=broad-except
             scraper_errors = [f"ratp_site: {exc}"]
             traffic_result = {}
@@ -415,7 +418,7 @@ class RatpClient:
         cycle_duration = trip_duration + dwell_seconds
         trains_per_direction = max(2, math.ceil(trip_duration / headway_seconds))
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         seconds_since_midnight = now.hour * 3600 + now.minute * 60 + now.second
 
         trains: List[Dict[str, Any]] = []
