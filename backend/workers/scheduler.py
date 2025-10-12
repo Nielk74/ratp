@@ -13,7 +13,7 @@ from typing import Iterable, List, Tuple, Optional
 
 from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
 from aiokafka.errors import KafkaConnectionError
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 
 from ..config import settings as app_settings
 from ..database import AsyncSessionLocal, init_db
@@ -146,6 +146,21 @@ async def scheduler_loop() -> None:
             now = datetime.now(timezone.utc)
             async with AsyncSessionLocal() as session:
                 await _mark_stale_tasks(session)
+                backlog_stmt = (
+                    select(func.count())
+                    .select_from(TaskRun)
+                    .where(TaskRun.status.in_(["queued", "pending", "running"]))
+                )
+                backlog = (await session.execute(backlog_stmt)).scalar() or 0
+                if backlog >= orchestrator_settings.scheduler_max_backlog:
+                    logger.info(
+                        "Skipping enqueue run (backlog=%s, limit=%s)",
+                        backlog,
+                        orchestrator_settings.scheduler_max_backlog,
+                    )
+                    trigger_event.set()
+                    await asyncio.sleep(orchestrator_settings.scheduler_interval_seconds)
+                    continue
                 for index, (network, line) in enumerate(targets):
                     job_id = f"{run_id}:{network}:{line}:{index}"
                     payload = {

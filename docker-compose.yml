@@ -69,7 +69,6 @@ services:
       DATABASE_URL: postgresql+asyncpg://ratp:ratp@db:5432/ratp
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       VMTR_SOCKET_ENABLED: "True"
-      WORKER_ID: worker-1
     depends_on:
       - backend
       - kafka
