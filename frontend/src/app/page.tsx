@@ -38,14 +38,19 @@ export default function Home() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [linesData, trafficData] = await Promise.all([
-          apiClient.getLines(),
-          apiClient.getTraffic(),
-        ]);
+        const linesPromise = apiClient.getLines();
+        const trafficPromise = apiClient
+          .getTraffic()
+          .catch((error) => {
+            console.error("Failed to fetch traffic data:", error);
+            return null;
+          });
+
+        const [linesData, trafficData] = await Promise.all([linesPromise, trafficPromise]);
         setLines(linesData.lines);
         setTraffic(trafficData);
       } catch (error) {
-        console.error("Failed to fetch data:", error);
+        console.error("Failed to fetch lines:", error);
       } finally {
         setLoading(false);
       }

@@ -39,7 +39,7 @@ export function TrafficStatus({ traffic, lines, onSelectLine, selectedLineCode }
     return undefined;
   }, [traffic?.source]);
 
-  if (!traffic || !hasLines) {
+  if (!hasLines) {
     return (
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-2xl font-bold mb-4">Traffic Status</h2>
@@ -57,7 +57,7 @@ export function TrafficStatus({ traffic, lines, onSelectLine, selectedLineCode }
       <div className="p-6 border-b border-gray-200">
         <h2 className="text-2xl font-bold text-gray-900">Metro Lines Status</h2>
         <p className="text-sm text-gray-500 mt-1">
-          Last updated: {lastUpdated ? lastUpdated.toLocaleTimeString() : new Date().toLocaleTimeString()}
+          Last updated: {lastUpdated ? lastUpdated.toLocaleTimeString() : "Not available"}
         </p>
       </div>
 
