@@ -40,7 +40,7 @@ def print_test(name: str, status: str, message: str = ""):
         print()
 
 
-def test_endpoint(
+def probe_endpoint(
     client: httpx.Client,
     method: str,
     path: str,
@@ -90,7 +90,7 @@ def main():
     with httpx.Client() as client:
         # Test 1: Health Check
         print(f"\n{Colors.BOLD}Core Endpoints:{Colors.RESET}")
-        success, msg = test_endpoint(client, "GET", "/health", check_keys=["status"])
+        success, msg = probe_endpoint(client, "GET", "/health", check_keys=["status"])
         if success:
             print_test("Health Check", "PASS", msg)
             tests_passed += 1
@@ -101,7 +101,7 @@ def main():
             return 1
 
         # Test 2: Root Endpoint
-        success, msg = test_endpoint(client, "GET", "/", check_keys=["name", "version", "status"])
+        success, msg = probe_endpoint(client, "GET", "/", check_keys=["name", "version", "status"])
         if success:
             print_test("Root Info", "PASS", msg)
             tests_passed += 1
@@ -110,7 +110,7 @@ def main():
             tests_failed += 1
 
         # Test 3: API Documentation
-        success, msg = test_endpoint(client, "GET", "/docs")
+        success, msg = probe_endpoint(client, "GET", "/docs")
         if success:
             print_test("API Docs (Swagger)", "PASS", msg)
             tests_passed += 1
@@ -122,7 +122,7 @@ def main():
         print(f"\n{Colors.BOLD}Lines API:{Colors.RESET}")
 
         # Test 4: Get all lines
-        success, msg = test_endpoint(client, "GET", "/api/lines/", check_keys=["lines", "count"])
+        success, msg = probe_endpoint(client, "GET", "/api/lines/", check_keys=["lines", "count"])
         if success:
             print_test("GET /api/lines/", "PASS", msg)
             tests_passed += 1
@@ -131,7 +131,7 @@ def main():
             tests_failed += 1
 
         # Test 5: Filter lines by type
-        success, msg = test_endpoint(
+        success, msg = probe_endpoint(
             client, "GET", "/api/lines/",
             params={"transport_type": "metro"},
             check_keys=["lines", "count"]
@@ -144,7 +144,7 @@ def main():
             tests_failed += 1
 
         # Test 6: Get stations for a line
-        success, msg = test_endpoint(client, "GET", "/api/lines/metros/1/stations")
+        success, msg = probe_endpoint(client, "GET", "/api/lines/metros/1/stations")
         if success:
             print_test("GET /api/lines/metros/1/stations", "PASS", msg)
             tests_passed += 1
@@ -156,7 +156,7 @@ def main():
         print(f"\n{Colors.BOLD}Traffic API:{Colors.RESET}")
 
         # Test 7: Get all traffic
-        success, msg = test_endpoint(client, "GET", "/api/traffic/", expected_status=200)
+        success, msg = probe_endpoint(client, "GET", "/api/traffic/", expected_status=200)
         if success:
             print_test("GET /api/traffic/", "PASS", msg)
             tests_passed += 1
@@ -165,7 +165,7 @@ def main():
             tests_warned += 1
 
         # Test 8: Get traffic for specific line
-        success, msg = test_endpoint(
+        success, msg = probe_endpoint(
             client, "GET", "/api/traffic/",
             params={"line_code": "1"}
         )
@@ -180,7 +180,7 @@ def main():
         print(f"\n{Colors.BOLD}Geolocation API:{Colors.RESET}")
 
         # Test 9: Find nearest stations
-        success, msg = test_endpoint(
+        success, msg = probe_endpoint(
             client, "GET", "/api/geo/nearest",
             params={"lat": 48.8584, "lon": 2.3470},
             check_keys=["results", "count"]
@@ -193,7 +193,7 @@ def main():
             tests_failed += 1
 
         # Test 10: Nearest stations with filters
-        success, msg = test_endpoint(
+        success, msg = probe_endpoint(
             client, "GET", "/api/geo/nearest",
             params={"lat": 48.8584, "lon": 2.3470, "max_results": 3, "max_distance": 2},
             check_keys=["results", "count"]

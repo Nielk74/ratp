@@ -48,7 +48,7 @@ class _FakeHttpScraper:
 def _build_scraper_with_payloads(payloads: Iterable[Dict]) -> RatpTrafficScraper:
     session = _DummySession(payloads)
     http_scraper = _FakeHttpScraper(session)
-    return RatpTrafficScraper(http_scraper=http_scraper)
+    return RatpTrafficScraper(http_scraper=http_scraper, use_cloudscraper=False)
 
 
 def test_fetch_status_groups_entries_across_networks():

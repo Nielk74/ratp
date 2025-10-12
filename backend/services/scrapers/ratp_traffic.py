@@ -67,11 +67,13 @@ class RatpTrafficScraper:
         *,
         base_url: str = "https://www.ratp.fr/api/traffic",
         http_scraper: Optional[RatpHttpScraper] = None,
+        use_cloudscraper: bool = True,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._http_scraper = http_scraper or RatpHttpScraper()
         self._session_lock = threading.Lock()
         self._session = None
+        self._use_cloudscraper = use_cloudscraper
 
     # Public API -----------------------------------------------------------------
 
@@ -151,7 +153,9 @@ class RatpTrafficScraper:
     ):
         # Attempt a lightweight cloudscraper session first; fall back to the
         # heavier Playwright bootstrapped flow when Cloudflare tightens the gate.
-        session = self._try_create_cloudscraper_session()
+        session = None
+        if self._use_cloudscraper:
+            session = self._try_create_cloudscraper_session()
         if session is None:
             session = self._http_scraper.get_session(context=context, force=force)
         session.headers.setdefault("User-Agent", _USER_AGENT)
