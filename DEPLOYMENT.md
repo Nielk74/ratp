@@ -110,33 +110,50 @@ ratp/
 
 ## 🚀 Deployment Instructions
 
-### Local Development
+### Local Development (Docker Compose)
 
-#### Backend
 ```bash
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env  # configure optional overrides (PRIM_API_KEY only for Navitia experiments)
-PYTHONPATH="$(pwd)/.." uvicorn backend.main:app --host 127.0.0.1 --port 8000
+git clone https://github.com/Nielk74/ratp.git
+cd ratp
+./serve.sh up          # starts Postgres, Kafka, backend, scheduler, worker, frontend
+./serve.sh logs        # optional: tail container logs
+./serve.sh down        # stop everything
 ```
-API docs: http://127.0.0.1:8000/docs (health: `/health`)
 
-#### Frontend
-```bash
-cd frontend
-npm install
-cp .env.local.example .env.local
-npm run dev -- --hostname 127.0.0.1 --port 8001
-```
-Frontend: http://127.0.0.1:8001 (default host auto-detects backend)
+Services exposed locally:
+- Frontend dashboard: http://localhost:3000
+- Orchestrator admin dashboard: http://localhost:3000/admin/orchestrator
+- Backend API docs: http://localhost:8000/docs
 
-#### One-command dev stack
-```bash
-./serve.sh
-```
-This kills stale `uvicorn`/`next` processes, starts the backend (port 8000) and a Next dev server (first free port starting at 8001).
+### Manual setup (advanced)
+
+You can still run pieces outside Docker for focused development:
+
+1. **Backend**
+   ```bash
+   cd backend
+   python -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   cp .env.example .env
+   PYTHONPATH="$(pwd)/.." uvicorn backend.main:app --host 127.0.0.1 --port 8000
+   ```
+
+2. **Frontend**
+   ```bash
+   cd frontend
+   npm install
+   cp .env.local.example .env.local
+   npm run dev -- --hostname 127.0.0.1 --port 3000
+   ```
+
+3. **Scheduler & workers**
+   ```bash
+   docker-compose up kafka db
+   docker-compose up scheduler worker
+   ```
+
+   The orchestrator requires Kafka and Postgres even in manual mode.
 
 ### Production Deployment
 
@@ -174,6 +191,11 @@ DATABASE_URL="sqlite+aiosqlite:///./ratp.db"
 PRIM_API_KEY=""  # Optional: Navitia departures fallback (disabled by default)
 # Allow multiple origins (comma-separated) e.g. http://localhost:3100,http://xps:3100
 CORS_ALLOW_ORIGINS="http://localhost:3000,http://localhost:3100"
+KAFKA_BOOTSTRAP_SERVERS="kafka:9092"
+KAFKA_FETCH_TOPIC="fetch.tasks"
+KAFKA_CONTROL_TOPIC="control.commands"
+KAFKA_METRICS_TOPIC="worker.metrics"
+SYSTEM_API_TOKEN="changeme"
 ```
 
 ### Frontend (.env.local)
@@ -181,6 +203,7 @@ CORS_ALLOW_ORIGINS="http://localhost:3000,http://localhost:3100"
 # Optional overrides when frontend host differs from backend
 NEXT_PUBLIC_BACKEND_HOST=xps
 NEXT_PUBLIC_BACKEND_PORT=8000
+NEXT_PUBLIC_SYSTEM_API_KEY=changeme
 ```
 
 ---

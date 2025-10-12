@@ -64,71 +64,64 @@ RATP Live Tracker
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.11+ and pip
-- Node.js 18+ and npm
+- Docker 24+
+- docker-compose 1.29+ (or `docker compose` plugin)
 - Git
 
-### Full Stack Setup
+### One-command stack (recommended)
 
-#### 1. Clone the repository
 ```bash
 git clone https://github.com/Nielk74/ratp.git
 cd ratp
+./serve.sh up          # or: docker-compose up -d
 ```
 
-#### 2. Backend Setup
+Once the containers are up:
+- Frontend dashboard: http://localhost:3000
+- Orchestrator admin (queue + workers): http://localhost:3000/admin/orchestrator
+- Backend API docs: http://localhost:8000/docs
+
+Tail logs with:
 
 ```bash
-# Navigate to backend directory
-cd backend
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your API keys (PRIM_API_KEY only required for optional Navitia features)
-
-# Run the server
-PYTHONPATH="$(pwd)/.." uvicorn backend.main:app --host 127.0.0.1 --port 8000
+./serve.sh logs backend worker scheduler
 ```
 
-API docs: `http://127.0.0.1:8000/docs` (health: `/health`)
-
-**Backend Documentation:**
-- **Interactive Docs (Swagger)**: http://localhost:8000/docs
-- **Alternative Docs (ReDoc)**: http://localhost:8000/redoc
-- **Health Check**: http://localhost:8000/health
-
-#### 3. Frontend Setup
-
-In a **new terminal window**:
+Stop everything:
 
 ```bash
-# Navigate to frontend directory
-cd frontend
-
-# Install dependencies
-npm install
-
-# Configure environment
-cp .env.local.example .env.local
-# By default the client derives the API origin from the browser host.
-# Override with NEXT_PUBLIC_BACKEND_HOST / NEXT_PUBLIC_BACKEND_PORT if needed
-
-# Start development server
-npm run dev -- --hostname 127.0.0.1 --port 8001
+./serve.sh down
 ```
 
-The frontend will be available at `http://127.0.0.1:8001`
+### Manual development setup (optional)
+
+If you prefer a local Python/Node workflow you can still run the services by hand.
+
+1. **Backend**
+   ```bash
+   cd backend
+   python -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   cp .env.example .env
+   PYTHONPATH="$(pwd)/.." uvicorn backend.main:app --host 127.0.0.1 --port 8000
+   ```
+   API docs: http://127.0.0.1:8000/docs
+
+2. **Frontend**
+   ```bash
+   cd frontend
+   npm install
+   cp .env.local.example .env.local
+   npm run dev -- --hostname 127.0.0.1 --port 3000
+   ```
+
+3. **Kafka/worker orchestration**  
+   You will still need Kafka + Postgres + the scheduler/worker processes for continuous scraping; the easiest way is to run `docker-compose up kafka db scheduler worker`.
 
 ### Dev helpers
 
-- `./serve.sh` – kills stale `uvicorn`/`next` processes, then starts backend (8000) and a Next.js dev server (first free port from 8001).
+- `./serve.sh` – wrapper around `docker-compose` (`up`, `down`, `logs`, `restart`); starts backend, frontend, Kafka, scheduler, and worker containers.
 - `./scripts/run_tests.sh` – ensures the backend virtualenv exists, installs pytest if needed, and runs the backend unit test suite.
 - `./scripts/check_m14_bibliotheque.sh` – calls the schedules endpoint for Metro 14 at Bibliothèque François-Mitterrand (direction configurable via `--direction`).
 - `./scripts/run_e2e.sh` – launches the stack, runs Playwright e2e specs, streams progress, and tears everything down (log tails on failure).

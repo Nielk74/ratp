@@ -14,7 +14,7 @@
 - Tooling:
   - Playwright config: `frontend/playwright.config.ts`
   - Main e2e spec: `frontend/tests/e2e/line-workflow.spec.ts`
-  - Orchestration scripts: `scripts/run_e2e.sh` (stack + Playwright) and `serve.sh` (dev servers w/ port cleanup)
+- Orchestration scripts: `scripts/run_e2e.sh` (stack + Playwright) and `serve.sh` (wrapper around docker-compose for backend/frontend/Kafka/workers)
 - Dependencies & Playwright browsers already installed (`frontend/`)
 
 ## Goal
@@ -29,5 +29,5 @@ Boost confidence in the live map workflow by keeping the VMTR websocket/IDFM pip
 ## Reminders
 - Inspect `metadata.source` and `metadata.navitia_error` to tell when the HTTP fallback was used; never fabricate departures.
 - Manual/Playwright captures belong under `backend/tmp/` (e.g. `ratp_sample.json`).
-- `scripts/run_e2e.sh` automates full-stack tests; `./serve.sh` handles local dev (kills stale `uvicorn`/`next`).
+- `scripts/run_e2e.sh` automates full-stack tests; `./serve.sh up` boots the full Docker stack (`./serve.sh down` stops it, `./serve.sh logs` tails containers).
 - Re-run `npx playwright install` from `frontend/` if browsers ever go missing.

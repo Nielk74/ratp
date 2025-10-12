@@ -2,22 +2,24 @@ version: "3.9"
 
 services:
   zookeeper:
-    image: bitnami/zookeeper:3.9
+    image: confluentinc/cp-zookeeper:7.5.0
     environment:
-      - ALLOW_ANONYMOUS_LOGIN=yes
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
 
   kafka:
-    image: bitnami/kafka:3.6
+    image: confluentinc/cp-kafka:7.5.0
     depends_on:
       - zookeeper
     environment:
-      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
-      - ALLOW_PLAINTEXT_LISTENER=yes
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     ports:
       - "9092:9092"
 
@@ -37,7 +39,7 @@ services:
       context: ./backend
     environment:
       DATABASE_URL: postgresql+asyncpg://ratp:ratp@db:5432/ratp
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       VMTR_SOCKET_ENABLED: "True"
       SYSTEM_API_TOKEN: changeme
     depends_on:
@@ -52,7 +54,7 @@ services:
     command: ["python", "-m", "backend.workers.scheduler"]
     environment:
       DATABASE_URL: postgresql+asyncpg://ratp:ratp@db:5432/ratp
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       VMTR_SOCKET_ENABLED: "True"
       SCHEDULER_INTERVAL_SECONDS: 120
     depends_on:
@@ -65,7 +67,7 @@ services:
     command: ["python", "-m", "backend.workers.worker"]
     environment:
       DATABASE_URL: postgresql+asyncpg://ratp:ratp@db:5432/ratp
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       VMTR_SOCKET_ENABLED: "True"
       WORKER_ID: worker-1
     depends_on:
@@ -86,4 +88,3 @@ services:
 
 volumes:
   db_data:
-*** End Patch

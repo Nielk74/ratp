@@ -235,7 +235,6 @@ class Worker:
             await asyncio.sleep(self.settings.worker_heartbeat_interval)
 
     async def run(self) -> None:
-        await init_db()
         self._producer = AIOKafkaProducer(
             bootstrap_servers=self.settings.kafka_bootstrap_servers,
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),

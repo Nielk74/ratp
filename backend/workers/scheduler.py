@@ -89,7 +89,6 @@ async def scheduler_loop() -> None:
         linger_ms=5,
     )
 
-    await init_db()
     await producer.start()
     logger.info("Scheduler started with %s targets", len(targets))
     host = socket.gethostname()
