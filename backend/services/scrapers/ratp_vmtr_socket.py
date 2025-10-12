@@ -44,7 +44,10 @@ class RatpVmtrSocketClient:
         connect_timeout: float = 10.0,
         listen_timeout: float = 8.0,
     ) -> None:
-        self._base_url = base_url.rstrip("/")
+        # Ensure the socket endpoint always ends with `/socket.io/` so the query
+        # string is appended correctly (`.../socket.io/?EIO=4...`). Stripping the
+        # trailing slash caused 502 responses in production.
+        self._base_url = base_url.rstrip("/") + "/"
         self._enabled = enabled
         self._connect_timeout = connect_timeout
         self._listen_timeout = listen_timeout
@@ -97,7 +100,7 @@ class RatpVmtrSocketClient:
 
         headers = [
             f"User-Agent: {_USER_AGENT}",
-            "Origin: https://www.ratp.fr",
+            "Origin: https://vmtr.ratp.fr",
             "Pragma: no-cache",
             "Cache-Control: no-cache",
         ]

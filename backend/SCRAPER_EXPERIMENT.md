@@ -92,6 +92,10 @@ Once IDFM enables the official feeds:
 - If Cloudflare blocks automated runs, open `/horaires` manually, solve the
   challenge once in a real browser, and re-run the scraper—the clearance cookie
   is usually accepted by Playwright afterwards.
+- VMTR websocket note: the public endpoint expects requests against
+  `wss://api.vmtr.ratp.fr/socket.io/` with `Origin: https://vmtr.ratp.fr`. Missing the
+  `/socket.io/` path or using the main ratp.fr origin yields 502 errors, so the
+  backend client now enforces both.
 
 ## Line snapshot API
 

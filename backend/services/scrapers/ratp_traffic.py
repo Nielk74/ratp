@@ -7,6 +7,7 @@ import threading
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+import cloudscraper
 from bs4 import BeautifulSoup
 
 from .ratp_http import RatpHttpScraper
@@ -148,11 +149,28 @@ class RatpTrafficScraper:
         context: Optional[Dict[str, str]] = None,
         force: bool = False,
     ):
-        # RatpHttpScraper already encapsulates the Playwright-based cookie dance.
-        session = self._http_scraper.get_session(context=context, force=force)
+        # Attempt a lightweight cloudscraper session first; fall back to the
+        # heavier Playwright bootstrapped flow when Cloudflare tightens the gate.
+        session = self._try_create_cloudscraper_session()
+        if session is None:
+            session = self._http_scraper.get_session(context=context, force=force)
         session.headers.setdefault("User-Agent", _USER_AGENT)
         session.headers.setdefault("Referer", "https://www.ratp.fr/infos-trafic")
+        session.headers.setdefault("Origin", "https://www.ratp.fr")
         return session
+
+    def _try_create_cloudscraper_session(self):
+        try:
+            scraper = cloudscraper.create_scraper(
+                browser={"browser": "chrome", "platform": "linux", "desktop": True},
+                delay=10,
+            )
+            scraper.headers.setdefault("Accept", "application/json, text/plain, */*")
+            scraper.headers.setdefault("Accept-Language", "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7")
+            scraper.get("https://www.ratp.fr/infos-trafic", timeout=10)
+            return scraper
+        except Exception:  # pragma: no cover - best effort shortcut
+            return None
 
     @staticmethod
     def _extract_entries(payload: Dict[str, Any], result_key: str) -> List[Dict[str, Any]]:
