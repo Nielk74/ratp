@@ -9,9 +9,10 @@ import socket
 import time
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Iterable, List, Tuple
+from typing import Iterable, List, Tuple, Optional
 
-from aiokafka import AIOKafkaProducer
+from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
+from aiokafka.errors import KafkaConnectionError
 from sqlalchemy import select, update
 
 from ..config import settings as app_settings
@@ -83,30 +84,38 @@ async def scheduler_loop() -> None:
         logger.warning("Scheduler has no targets configured; exiting.")
         return
 
-    producer = AIOKafkaProducer(
-        bootstrap_servers=orchestrator_settings.kafka_bootstrap_servers,
-        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-        linger_ms=5,
-    )
+    async def _start_producer() -> AIOKafkaProducer:
+        while True:
+            try:
+                producer = AIOKafkaProducer(
+                    bootstrap_servers=orchestrator_settings.kafka_bootstrap_servers,
+                    value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+                    linger_ms=5,
+                )
+                await producer.start()
+                return producer
+            except KafkaConnectionError as exc:
+                logger.warning("Kafka not ready for scheduler producer: %s", exc)
+                await asyncio.sleep(3)
 
-    await producer.start()
-    logger.info("Scheduler started with %s targets", len(targets))
-    host = socket.gethostname()
+    async def _control_loop(trigger_event: asyncio.Event) -> None:
+        consumer: Optional[AIOKafkaConsumer] = None
+        while consumer is None:
+            try:
+                consumer = AIOKafkaConsumer(
+                    orchestrator_settings.kafka_control_topic,
+                    bootstrap_servers=orchestrator_settings.kafka_bootstrap_servers,
+                    group_id="scheduler-control",
+                    value_deserializer=lambda v: json.loads(v.decode("utf-8")),
+                    enable_auto_commit=True,
+                    auto_offset_reset="earliest",
+                )
+                await consumer.start()
+            except KafkaConnectionError as exc:
+                logger.warning("Kafka not ready for scheduler control consumer: %s", exc)
+                consumer = None
+                await asyncio.sleep(3)
 
-    trigger_event = asyncio.Event()
-    trigger_event.set()
-
-    async def control_loop():
-        from aiokafka import AIOKafkaConsumer  # local import to avoid circular on module load
-
-        consumer = AIOKafkaConsumer(
-            orchestrator_settings.kafka_control_topic,
-            bootstrap_servers=orchestrator_settings.kafka_bootstrap_servers,
-            group_id="scheduler-control",
-            value_deserializer=lambda v: json.loads(v.decode("utf-8")),
-            enable_auto_commit=True,
-        )
-        await consumer.start()
         try:
             async for msg in consumer:
                 command = (msg.value.get("command") or "").upper()
@@ -120,7 +129,13 @@ async def scheduler_loop() -> None:
         finally:
             await consumer.stop()
 
-    control_task = asyncio.create_task(control_loop())
+    producer = await _start_producer()
+    logger.info("Scheduler started with %s targets", len(targets))
+    host = socket.gethostname()
+
+    trigger_event = asyncio.Event()
+    trigger_event.set()
+    control_task = asyncio.create_task(_control_loop(trigger_event))
 
     try:
         while True:
@@ -132,7 +147,7 @@ async def scheduler_loop() -> None:
             async with AsyncSessionLocal() as session:
                 await _mark_stale_tasks(session)
                 for index, (network, line) in enumerate(targets):
-                    job_id = f"{network}:{line}:{int(now.timestamp())}:{index}"
+                    job_id = f"{run_id}:{network}:{line}:{index}"
                     payload = {
                         "job_id": job_id,
                         "run_id": run_id,
