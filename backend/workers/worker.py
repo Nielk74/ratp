@@ -161,6 +161,10 @@ class Worker:
                 refresh=True,
                 station_limit=None,
             )
+        except ValueError as exc:
+            logger.info("Skipping snapshot for %s %s: %s", network, line, exc)
+            status = "skipped"
+            error_message = str(exc)
         except Exception as exc:  # pylint: disable=broad-except
             logger.exception("Failed to fetch snapshot for %s %s", network, line)
             status = "error"

@@ -115,7 +115,7 @@ ratp/
 ```bash
 git clone https://github.com/Nielk74/ratp.git
 cd ratp
-./serve.sh up          # builds images and starts Postgres, Kafka, backend, scheduler, worker, frontend
+./serve.sh up          # builds images and starts Postgres, Kafka, backend, scheduler, worker, frontend (defaults to metro 1 & RER A)
 ./serve.sh logs        # optional: tail container logs
 ./serve.sh down        # stop everything
 ```
@@ -149,11 +149,12 @@ You can still run pieces outside Docker for focused development:
 
 3. **Scheduler & workers**
    ```bash
+   export SCHEDULER_LINES="metro:1,rer:A"
    docker-compose up kafka db
    docker-compose up scheduler worker
    ```
 
-   The orchestrator requires Kafka and Postgres even in manual mode.
+   The orchestrator requires Kafka and Postgres even in manual mode; expand `SCHEDULER_LINES` once you confirm the pipeline.
 
 ### Production Deployment
 

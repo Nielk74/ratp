@@ -73,7 +73,7 @@ RATP Live Tracker
 ```bash
 git clone https://github.com/Nielk74/ratp.git
 cd ratp
-./serve.sh up          # builds images and starts all services
+./serve.sh up          # builds images and starts all services (defaults to metro 1 & RER A)
 ```
 
 Once the containers are up:
@@ -117,7 +117,7 @@ If you prefer a local Python/Node workflow you can still run the services by han
    ```
 
 3. **Kafka/worker orchestration**  
-   You will still need Kafka + Postgres + the scheduler/worker processes for continuous scraping; the easiest way is to run `docker-compose up kafka db scheduler worker`.
+   Export `SCHEDULER_LINES="metro:1,rer:A"` (adjust as needed) and run `docker-compose up kafka db scheduler worker` so the background queue stays manageable while developing locally.
 
 ### Dev helpers
 

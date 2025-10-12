@@ -48,7 +48,7 @@ class Settings:
     kafka_control_topic: str = os.getenv("KAFKA_CONTROL_TOPIC", "control.commands")
     kafka_metrics_topic: str = os.getenv("KAFKA_METRICS_TOPIC", "worker.metrics")
     scheduler_interval_seconds: int = int(os.getenv("SCHEDULER_INTERVAL_SECONDS", "120"))
-    scheduler_lines: str = os.getenv("SCHEDULER_LINES", "")
+    scheduler_lines: str = os.getenv("SCHEDULER_LINES", "metro:1,rer:A")
     worker_heartbeat_interval: int = int(os.getenv("WORKER_HEARTBEAT_INTERVAL", "10"))
     worker_batch_size: int = int(os.getenv("WORKER_BATCH_SIZE", "1"))
     task_timeout_seconds: int = int(os.getenv("TASK_TIMEOUT_SECONDS", "60"))
