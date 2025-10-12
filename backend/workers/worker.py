@@ -246,6 +246,7 @@ class Worker:
             group_id="live-data-workers",
             value_deserializer=lambda v: json.loads(v.decode("utf-8")),
             enable_auto_commit=True,
+            auto_offset_reset="earliest",
             max_poll_records=self.settings.worker_batch_size,
         )
 
