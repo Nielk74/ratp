@@ -116,6 +116,7 @@ ratp/
 git clone https://github.com/Nielk74/ratp.git
 cd ratp
 ./serve.sh up          # builds images and starts Postgres, Kafka, backend, scheduler, worker, frontend (defaults to metro 1 & RER A)
+# add --workers N to scale the worker pool
 ./serve.sh logs        # optional: tail container logs
 ./serve.sh down        # stop everything
 ```

@@ -14,7 +14,7 @@
 - Tooling:
   - Playwright config: `frontend/playwright.config.ts`
   - Main e2e spec: `frontend/tests/e2e/line-workflow.spec.ts`
-- Orchestration scripts: `scripts/run_e2e.sh` (stack + Playwright) and `serve.sh` (wrapper around docker-compose for backend/frontend/Kafka/workers)
+- Orchestration scripts: `scripts/run_e2e.sh` (stack + Playwright) and `serve.sh` (wrapper around docker-compose for backend/frontend/Kafka/workers; supports `--workers N`).
 - Dependencies & Playwright browsers already installed (`frontend/`)
 
 ## Goal

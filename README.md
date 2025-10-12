@@ -121,7 +121,7 @@ If you prefer a local Python/Node workflow you can still run the services by han
 
 ### Dev helpers
 
-- `./serve.sh` – wrapper around `docker-compose` (`up`, `down`, `logs`, `restart`); starts backend, frontend, Kafka, scheduler, and worker containers.
+- `./serve.sh` – wrapper around `docker-compose` (`up`, `down`, `logs`, `restart`); starts backend, frontend, Kafka, scheduler, and worker containers. Use `./serve.sh up --workers 3` to scale the worker pool.
 - `./scripts/stop_services.sh` – convenience wrapper that simply invokes `./serve.sh down` (accepts the same extra args).
 - `./scripts/run_tests.sh` – ensures the backend virtualenv exists, installs pytest if needed, and runs the backend unit test suite.
 - `./scripts/check_m14_bibliotheque.sh` – calls the schedules endpoint for Metro 14 at Bibliothèque François-Mitterrand (direction configurable via `--direction`).
