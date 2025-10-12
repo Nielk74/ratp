@@ -21,7 +21,7 @@ shift || true
 case "$ACTION" in
   up)
     echo "[serve] starting orchestrator stack (backend, frontend, kafka, workers)"
-    "$COMPOSE_BIN" -f "${COMPOSE_FILE}" up -d "$@"
+    "$COMPOSE_BIN" -f "${COMPOSE_FILE}" up -d --build "$@"
     echo "[serve] stack is starting. Useful URLs:"
     echo "  - Frontend:            http://localhost:3000"
     echo "  - Orchestrator admin:  http://localhost:3000/admin/orchestrator"

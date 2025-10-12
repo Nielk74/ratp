@@ -115,7 +115,7 @@ ratp/
 ```bash
 git clone https://github.com/Nielk74/ratp.git
 cd ratp
-./serve.sh up          # starts Postgres, Kafka, backend, scheduler, worker, frontend
+./serve.sh up          # builds images and starts Postgres, Kafka, backend, scheduler, worker, frontend
 ./serve.sh logs        # optional: tail container logs
 ./serve.sh down        # stop everything
 ```

@@ -73,7 +73,7 @@ RATP Live Tracker
 ```bash
 git clone https://github.com/Nielk74/ratp.git
 cd ratp
-./serve.sh up          # or: docker-compose up -d
+./serve.sh up          # builds images and starts all services
 ```
 
 Once the containers are up:
