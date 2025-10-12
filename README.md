@@ -18,6 +18,7 @@ Real-time monitoring system for Paris public transport (RATP) with live traffic 
 - **Discord Webhooks** with confirmation messages and CRUD endpoints
 - **Geolocation & Utilities**: nearest-station search, in-memory cache, typed configuration
 - **Automated Tests**: 48 passes covering services, models, and REST contracts
+- **Background Orchestrator**: Kafka-backed scheduler + worker fleet keeping live data and traffic snapshots fresh (see [`docs/LIVE_DATA_ORCHESTRATION.md`](docs/LIVE_DATA_ORCHESTRATION.md))
 
 > ℹ️ _True vehicle locations and mission ETAs need IDFM SIRI/GTFS-RT access. See the “Real-Time Train Position Plan” in `plan.md` for activation steps._
 

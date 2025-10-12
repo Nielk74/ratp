@@ -7,6 +7,7 @@ from .traffic import TrafficEvent
 from .schedule import ScheduleHistory
 from .webhook import WebhookSubscription
 from .forecast import ForecastPrediction
+from .live_snapshot import LiveSnapshot, TaskRun, WorkerStatus
 
 __all__ = [
     "Base",
@@ -17,4 +18,7 @@ __all__ = [
     "ScheduleHistory",
     "WebhookSubscription",
     "ForecastPrediction",
+    "LiveSnapshot",
+    "TaskRun",
+    "WorkerStatus",
 ]

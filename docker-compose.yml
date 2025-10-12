@@ -1,0 +1,89 @@
+version: "3.9"
+
+services:
+  zookeeper:
+    image: bitnami/zookeeper:3.9
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: bitnami/kafka:3.6
+    depends_on:
+      - zookeeper
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    ports:
+      - "9092:9092"
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ratp
+      POSTGRES_PASSWORD: ratp
+      POSTGRES_DB: ratp
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ratp:ratp@db:5432/ratp
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      VMTR_SOCKET_ENABLED: "True"
+      SYSTEM_API_TOKEN: changeme
+    depends_on:
+      - db
+      - kafka
+    ports:
+      - "8000:8000"
+
+  scheduler:
+    build:
+      context: ./backend
+    command: ["python", "-m", "backend.workers.scheduler"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ratp:ratp@db:5432/ratp
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      VMTR_SOCKET_ENABLED: "True"
+      SCHEDULER_INTERVAL_SECONDS: 120
+    depends_on:
+      - backend
+      - kafka
+
+  worker:
+    build:
+      context: ./backend
+    command: ["python", "-m", "backend.workers.worker"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ratp:ratp@db:5432/ratp
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      VMTR_SOCKET_ENABLED: "True"
+      WORKER_ID: worker-1
+    depends_on:
+      - backend
+      - kafka
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      NEXT_PUBLIC_BACKEND_HOST: backend
+      NEXT_PUBLIC_BACKEND_PORT: "8000"
+      NEXT_PUBLIC_SYSTEM_API_KEY: changeme
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+
+volumes:
+  db_data:
+*** End Patch

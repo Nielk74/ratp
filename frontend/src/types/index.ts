@@ -151,3 +151,30 @@ export interface LineSnapshot {
   trains: Record<string, TrainEstimate[]>;
   errors: string[];
 }
+
+export interface WorkerStatusInfo {
+  worker_id: string;
+  status: string;
+  host?: string | null;
+  started_at?: string | null;
+  last_heartbeat?: string | null;
+  metrics?: Record<string, unknown>;
+}
+
+export interface TaskRunInfo {
+  job_id: string;
+  network: string;
+  line: string;
+  status: string;
+  worker_id?: string | null;
+  scheduled_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  error_message?: string | null;
+}
+
+export interface QueueMetrics {
+  pending: number;
+  total: number;
+  last_scheduled_at?: string | null;
+}

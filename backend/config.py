@@ -42,6 +42,18 @@ class Settings:
     vmtr_socket_url: str = os.getenv("VMTR_SOCKET_URL", "wss://api.vmtr.ratp.fr/socket.io/")
     vmtr_socket_enabled: bool = os.getenv("VMTR_SOCKET_ENABLED", "False") == "True"
 
+    # Queue & Workers
+    kafka_bootstrap_servers: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+    kafka_fetch_topic: str = os.getenv("KAFKA_FETCH_TOPIC", "fetch.tasks")
+    kafka_control_topic: str = os.getenv("KAFKA_CONTROL_TOPIC", "control.commands")
+    kafka_metrics_topic: str = os.getenv("KAFKA_METRICS_TOPIC", "worker.metrics")
+    scheduler_interval_seconds: int = int(os.getenv("SCHEDULER_INTERVAL_SECONDS", "120"))
+    scheduler_lines: str = os.getenv("SCHEDULER_LINES", "")
+    worker_heartbeat_interval: int = int(os.getenv("WORKER_HEARTBEAT_INTERVAL", "10"))
+    worker_batch_size: int = int(os.getenv("WORKER_BATCH_SIZE", "1"))
+    task_timeout_seconds: int = int(os.getenv("TASK_TIMEOUT_SECONDS", "60"))
+    system_api_token: str = os.getenv("SYSTEM_API_TOKEN", "")
+
     # Rate Limiting
     rate_limit_enabled: bool = os.getenv("RATE_LIMIT_ENABLED", "True") == "True"
     rate_limit_per_minute: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "100"))
@@ -82,6 +94,17 @@ class Settings:
     def is_development(self) -> bool:
         """Check if running in development environment."""
         return self.environment.lower() == "development"
+
+    @property
+    def scheduler_targets(self) -> List[str]:
+        """Return raw scheduler line filters (e.g., ['metro:1', 'rer:A'])."""
+        if not self.scheduler_lines:
+            return []
+        return [
+            value.strip()
+            for value in self.scheduler_lines.split(",")
+            if value.strip()
+        ]
 
 
 # Global settings instance

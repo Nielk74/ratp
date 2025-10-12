@@ -7,9 +7,13 @@ import type {
   Schedule,
   WebhookSubscription,
   LineSnapshot,
+  WorkerStatusInfo,
+  TaskRunInfo,
+  QueueMetrics,
 } from "@/types";
 
 const DEFAULT_BACKEND_PORT = process.env.NEXT_PUBLIC_BACKEND_PORT || "8000";
+const SYSTEM_API_TOKEN = process.env.NEXT_PUBLIC_SYSTEM_API_KEY || "";
 
 function resolveBaseUrl(): string {
   if (typeof window !== "undefined") {
@@ -34,6 +38,10 @@ const api = axios.create({
 });
 api.interceptors.request.use((config) => {
   config.baseURL = resolveBaseUrl();
+  if (SYSTEM_API_TOKEN) {
+    config.headers = config.headers ?? {};
+    config.headers["X-API-Key"] = SYSTEM_API_TOKEN;
+  }
   return config;
 });
 
@@ -140,5 +148,30 @@ export const apiClient = {
     const params = refresh ? { refresh: true } : {};
     const { data } = await api.get(`/api/snapshots/${network}/${lineCode}`, { params });
     return data;
+  },
+
+  async getSystemWorkers(): Promise<WorkerStatusInfo[]> {
+    const { data } = await api.get("/api/system/workers");
+    return data.workers ?? [];
+  },
+
+  async getRecentTaskRuns(limit = 25): Promise<TaskRunInfo[]> {
+    const { data } = await api.get("/api/system/tasks/recent", { params: { limit } });
+    return data.items ?? [];
+  },
+
+  async getQueueMetrics(): Promise<QueueMetrics> {
+    const { data } = await api.get("/api/system/queue");
+    return data;
+  },
+
+  async sendWorkerCommand(workerId: string, command: string): Promise<void> {
+    await api.post(`/api/system/workers/${workerId}/command`, null, {
+      params: { command },
+    });
+  },
+
+  async triggerSchedulerRun(): Promise<void> {
+    await api.post("/api/system/scheduler/run", null);
   },
 };
