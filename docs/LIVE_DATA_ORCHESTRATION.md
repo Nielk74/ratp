@@ -68,6 +68,7 @@ Implementation:
 - Periodically expires long-idle `task_runs` rows and retries jobs that were mid-flight when a worker crashed, preventing backlog buildup.
 - Prunes stale `worker_status` entries by marking missing heartbeats as `lost` and deleting idle/stopped replicas whose heartbeats have fallen out of the safety window.
 - Runs as long-lived container (`scheduler` service in compose).
+- Exposes a scaling command hook (`WORKER_SCALE_COMMAND`) that the admin dashboard can call to add/remove workers (e.g., `docker compose up -d --scale worker={count} worker`).
 
 ### Worker
 - Python async consumer using `aiokafka.AIOKafkaConsumer`.
@@ -80,6 +81,7 @@ Implementation:
   - `worker_heartbeats`: worker_id, last_seen_at, cpu/mem stats, assigned partitions. Workers that vanish mid-run are marked `lost` during scheduler maintenance.
 - Emits heartbeat & metrics to Kafka `worker.metrics` (consumed by backend) and removes its own `worker_status` row on shutdown so the fleet list stays clean.
 - Responds to control commands (`PAUSE`, `RESUME`, `REBAlANCE`) via `control.commands`.
+- Can be spawned/terminated dynamically from the dashboard when `WORKER_SCALE_COMMAND` is set, making it easy to right-size the pool without shell access.
 
 Scaling:
 - Each replica gets unique `WORKER_ID`.
@@ -100,9 +102,10 @@ Scaling:
 - Sections:
   1. **Queue Overview**: tasks pending, throughput, oldest lag.
   2. **Worker Fleet**: table with status (Healthy, Behind, Down), last heartbeat, host info.
-  3. **Recent Task Runs**: success/error timeline with filters.
-  4. **Controls**: buttons (`Pause`, `Resume`, `Rebalance`, `Requeue failed tasks`), trigger API calls.
-  5. **Scheduler Status**: last tick time, next run, manual “Run now”.
+  3. **Scaling Controls**: add/remove worker buttons wired to `WORKER_SCALE_COMMAND`.
+  4. **Recent Task Runs**: success/error timeline with filters.
+  5. **Controls**: buttons (`Pause`, `Resume`, `Rebalance`, `Requeue failed tasks`), trigger API calls.
+  6. **Scheduler Status**: last tick time, next run, manual “Run now”.
 - Use charts (e.g., Recharts) optional; start with simple components.
 
 ### Docker Compose

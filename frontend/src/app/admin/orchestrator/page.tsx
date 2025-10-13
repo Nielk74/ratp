@@ -67,6 +67,25 @@ export default function OrchestratorDashboard() {
     [fetchData],
   );
 
+  const handleScale = useCallback(
+    async (delta: number) => {
+      const target = Math.max(0, workers.length + delta);
+      if (target === workers.length) {
+        return;
+      }
+      try {
+        setCommandState({ loading: true, message: null, error: null });
+        await apiClient.scaleWorkers(target);
+        setCommandState({ loading: false, message: `Scaled worker pool to ${target}`, error: null });
+        await fetchData();
+      } catch (error) {
+        console.error(error);
+        setCommandState({ loading: false, message: null, error: "Unable to scale workers" });
+      }
+    },
+    [fetchData, workers.length],
+  );
+
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 30000);
@@ -101,6 +120,21 @@ export default function OrchestratorDashboard() {
             >
               Trigger scheduler run
             </button>
+            <button
+              onClick={() => handleScale(1)}
+              className="px-3 py-2 rounded-md bg-blue-600 text-white text-sm shadow hover:bg-blue-500 disabled:opacity-60"
+              disabled={commandState.loading}
+            >
+              Add worker
+            </button>
+            <button
+              onClick={() => handleScale(-1)}
+              className="px-3 py-2 rounded-md bg-rose-600 text-white text-sm shadow hover:bg-rose-500 disabled:opacity-60"
+              disabled={commandState.loading || workers.length === 0}
+            >
+              Remove worker
+            </button>
+            <span className="text-sm text-gray-600">Active workers: {workers.length}</span>
             {commandState.message && <span className="text-sm text-green-600">{commandState.message}</span>}
             {commandState.error && <span className="text-sm text-red-600">{commandState.error}</span>}
           </div>

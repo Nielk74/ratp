@@ -54,6 +54,8 @@ class Settings:
     worker_batch_size: int = int(os.getenv("WORKER_BATCH_SIZE", "1"))
     task_timeout_seconds: int = int(os.getenv("TASK_TIMEOUT_SECONDS", "60"))
     system_api_token: str = os.getenv("SYSTEM_API_TOKEN", "")
+    worker_scale_command: str = os.getenv("WORKER_SCALE_COMMAND", "").strip()
+    worker_scale_workdir: str = os.getenv("WORKER_SCALE_WORKDIR", str(PROJECT_ROOT))
 
     # Rate Limiting
     rate_limit_enabled: bool = os.getenv("RATE_LIMIT_ENABLED", "True") == "True"

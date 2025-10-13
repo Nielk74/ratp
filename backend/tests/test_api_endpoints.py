@@ -227,3 +227,27 @@ async def test_get_traffic_status_endpoint(mock_get, client: AsyncClient):
     assert len(data["lines"]) == 1
     assert data["lines"][0]["line_code"] == "1"
     assert data["lines"][0]["source"] == "prim"
+
+
+@pytest.mark.asyncio
+async def test_scale_workers_requires_configuration(client: AsyncClient):
+    """Scaling endpoint should return 501 when no command is configured."""
+    response = await client.post("/api/system/workers/scale", json={"count": 2})
+
+    assert response.status_code == 501
+
+
+@pytest.mark.asyncio
+async def test_scale_workers_runs_command(monkeypatch, client: AsyncClient):
+    """Scaling endpoint should execute the configured command template."""
+    from backend.config import settings as app_settings
+
+    monkeypatch.setattr(app_settings, "worker_scale_command", "/bin/echo {count}")
+    monkeypatch.setattr(app_settings, "worker_scale_workdir", ".")
+
+    response = await client.post("/api/system/workers/scale", json={"count": 3})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 3
+    assert payload["stdout"] == "3"

@@ -18,7 +18,7 @@ Real-time monitoring system for Paris public transport (RATP) with live traffic 
 - **Discord Webhooks** with confirmation messages and CRUD endpoints
 - **Geolocation & Utilities**: nearest-station search, in-memory cache, typed configuration
 - **Automated Tests**: 48 passes covering services, models, and REST contracts
-- **Background Orchestrator**: Kafka-backed scheduler + worker fleet keeping live data and traffic snapshots fresh, with automatic task expiry and worker heartbeat pruning (see [`docs/LIVE_DATA_ORCHESTRATION.md`](docs/LIVE_DATA_ORCHESTRATION.md))
+- **Background Orchestrator**: Kafka-backed scheduler + worker fleet keeping live data and traffic snapshots fresh, with automatic task expiry and worker heartbeat pruning. Scaling controls are exposed in the admin dashboard when `WORKER_SCALE_COMMAND` is configured (see [`docs/LIVE_DATA_ORCHESTRATION.md`](docs/LIVE_DATA_ORCHESTRATION.md))
 
 > ℹ️ _True vehicle locations and mission ETAs need IDFM SIRI/GTFS-RT access. See the “Real-Time Train Position Plan” in `plan.md` for activation steps._
 
@@ -122,6 +122,7 @@ If you prefer a local Python/Node workflow you can still run the services by han
 ### Dev helpers
 
 - `./serve.sh` – wrapper around `docker-compose` (`up`, `down`, `logs`, `restart`); starts backend, frontend, Kafka, scheduler, and worker containers. Use `./serve.sh up --workers 3` to scale the worker pool.
+- Optional: set `WORKER_SCALE_COMMAND="/usr/bin/docker compose -f docker-compose.yml up -d --scale worker={count} worker"` (adjust paths as needed) so the orchestrator dashboard can add/remove workers on demand.
 - `./scripts/stop_services.sh` – convenience wrapper that simply invokes `./serve.sh down` (accepts the same extra args).
 - `./scripts/run_tests.sh` – ensures the backend virtualenv exists, installs pytest if needed, and runs the backend unit test suite.
 - `./scripts/check_m14_bibliotheque.sh` – calls the schedules endpoint for Metro 14 at Bibliothèque François-Mitterrand (direction configurable via `--direction`).

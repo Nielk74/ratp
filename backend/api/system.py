@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import shlex
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,6 +40,12 @@ async def _send_control_command(payload: Dict[str, Any]) -> None:
         await producer.send_and_wait(settings.kafka_control_topic, payload)
     finally:
         await producer.stop()
+
+
+class WorkerScaleRequest(BaseModel):
+    """Request payload for scaling the worker pool."""
+
+    count: int = Field(ge=0, description="Desired number of worker processes/containers.")
 
 
 @router.get("/workers", dependencies=[Depends(_require_system_token)])
@@ -111,6 +120,45 @@ async def send_worker_command(worker_id: str, command: str) -> Dict[str, Any]:
     }
     await _send_control_command(payload)
     return {"status": "queued", "payload": payload}
+
+
+@router.post("/workers/scale", dependencies=[Depends(_require_system_token)])
+async def scale_workers(request: WorkerScaleRequest) -> Dict[str, Any]:
+    command_template = settings.worker_scale_command
+    if not command_template:
+        raise HTTPException(status_code=501, detail="Worker scaling command not configured")
+
+    try:
+        command_parts = [segment.format(count=request.count) for segment in shlex.split(command_template)]
+    except KeyError as exc:
+        raise HTTPException(status_code=500, detail=f"Invalid worker scaling command template: missing key {exc}") from exc
+
+    process = await asyncio.create_subprocess_exec(
+        *command_parts,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        cwd=settings.worker_scale_workdir,
+    )
+    stdout_bytes, stderr_bytes = await process.communicate()
+    stdout_text = stdout_bytes.decode("utf-8", errors="ignore").strip()
+    stderr_text = stderr_bytes.decode("utf-8", errors="ignore").strip()
+    if process.returncode != 0:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "Worker scaling command failed",
+                "exit_code": process.returncode,
+                "stdout": stdout_text,
+                "stderr": stderr_text,
+            },
+        )
+
+    return {
+        "status": "ok",
+        "count": request.count,
+        "stdout": stdout_text,
+        "stderr": stderr_text,
+    }
 
 
 @router.post("/scheduler/run", dependencies=[Depends(_require_system_token)])
