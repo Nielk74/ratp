@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import shlex
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -18,6 +19,7 @@ from ..database import get_db_session
 from ..models import TaskRun, WorkerStatus
 
 router = APIRouter()
+logger = logging.getLogger("system")
 
 
 async def _require_system_token(x_api_key: Optional[str] = Header(default=None)) -> None:
@@ -53,6 +55,29 @@ class WorkerScaleRequest(BaseModel):
         if self.count is None and self.delta is None:
             raise ValueError("Either count or delta must be provided")
         return self
+
+
+async def _current_worker_count(prefix: str) -> int:
+    process = await asyncio.create_subprocess_exec(
+        "docker",
+        "ps",
+        "--filter",
+        f"name={prefix}",
+        "--format",
+        "{{.Names}}",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await process.communicate()
+    if process.returncode != 0:
+        logger.warning(
+            "Failed to inspect current worker containers (rc=%s, stderr=%s)",
+            process.returncode,
+            stderr.decode().strip(),
+        )
+        return 0
+    names = [line.strip() for line in stdout.decode().splitlines() if line.strip()]
+    return len(names)
 
 
 @router.get("/workers", dependencies=[Depends(_require_system_token)])
@@ -130,7 +155,7 @@ async def send_worker_command(worker_id: str, command: str) -> Dict[str, Any]:
 
 
 @router.post("/workers/scale", dependencies=[Depends(_require_system_token)])
-async def scale_workers(request: WorkerScaleRequest, db: AsyncSession = Depends(get_db_session)) -> Dict[str, Any]:
+async def scale_workers(request: WorkerScaleRequest) -> Dict[str, Any]:
     command_template = settings.worker_scale_command
     if not command_template:
         raise HTTPException(status_code=501, detail="Worker scaling command not configured")
@@ -138,12 +163,7 @@ async def scale_workers(request: WorkerScaleRequest, db: AsyncSession = Depends(
     if request.count is not None:
         target = request.count
     else:
-        active_stmt = (
-            select(func.count())
-            .select_from(WorkerStatus)
-            .where(~WorkerStatus.status.in_(["lost", "stopped"]))
-        )
-        active_count = (await db.execute(active_stmt)).scalar() or 0
+        active_count = await _current_worker_count(settings.worker_container_prefix)
         target = max(0, active_count + (request.delta or 0))
 
     try:
@@ -188,3 +208,27 @@ async def trigger_scheduler_run() -> Dict[str, Any]:
     }
     await _send_control_command(payload)
     return {"status": "queued", "payload": payload}
+
+
+@router.get("/db/summary", dependencies=[Depends(_require_system_token)])
+async def database_summary(db: AsyncSession = Depends(get_db_session)) -> Dict[str, Any]:
+    task_stmt = select(TaskRun.status, func.count()).group_by(TaskRun.status)
+    worker_stmt = select(WorkerStatus.status, func.count()).group_by(WorkerStatus.status)
+
+    task_counts: Dict[str, int] = {}
+    for status, count in (await db.execute(task_stmt)).all():
+        task_counts[status or "unknown"] = count or 0
+
+    worker_counts: Dict[str, int] = {}
+    for status, count in (await db.execute(worker_stmt)).all():
+        worker_counts[status or "unknown"] = count or 0
+
+    total_workers = sum(worker_counts.values())
+    active_workers = sum(count for status, count in worker_counts.items() if status not in {"lost", "stopped"})
+
+    return {
+        "task_counts": task_counts,
+        "worker_counts": worker_counts,
+        "total_workers": total_workers,
+        "active_workers": active_workers,
+    }

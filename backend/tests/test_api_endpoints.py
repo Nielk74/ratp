@@ -2,7 +2,7 @@
 
 import pytest
 from httpx import AsyncClient
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 
 @pytest.mark.asyncio
@@ -260,13 +260,15 @@ async def test_scale_workers_delta(monkeypatch, client: AsyncClient):
 
     monkeypatch.setattr(app_settings, "worker_scale_command", "/bin/echo {count}")
     monkeypatch.setattr(app_settings, "worker_scale_workdir", ".")
+    monkeypatch.setattr(app_settings, "worker_container_prefix", "ratp_worker")
+    monkeypatch.setattr("backend.api.system._current_worker_count", AsyncMock(return_value=5))
 
     response = await client.post("/api/system/workers/scale", json={"delta": 2})
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["count"] == 2
-    assert payload["stdout"] == "2"
+    assert payload["count"] == 7
+    assert payload["stdout"] == "7"
 
 
 @pytest.mark.asyncio
@@ -275,3 +277,16 @@ async def test_scale_workers_validation(client: AsyncClient):
     response = await client.post("/api/system/workers/scale", json={})
 
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_db_summary_endpoint(client: AsyncClient):
+    """Database summary endpoint should return task and worker counts."""
+    response = await client.get("/api/system/db/summary")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "task_counts" in data
+    assert "worker_counts" in data
+    assert "total_workers" in data
+    assert "active_workers" in data

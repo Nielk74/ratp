@@ -56,6 +56,8 @@ class Settings:
     system_api_token: str = os.getenv("SYSTEM_API_TOKEN", "")
     worker_scale_command: str = os.getenv("WORKER_SCALE_COMMAND", "").strip()
     worker_scale_workdir: str = os.getenv("WORKER_SCALE_WORKDIR", str(PROJECT_ROOT))
+    worker_compose_project: str = os.getenv("WORKER_COMPOSE_PROJECT", "ratp")
+    worker_container_prefix: str = os.getenv("WORKER_CONTAINER_PREFIX", "ratp-worker")
 
     # Rate Limiting
     rate_limit_enabled: bool = os.getenv("RATE_LIMIT_ENABLED", "True") == "True"

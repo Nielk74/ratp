@@ -16,20 +16,23 @@ export default function OrchestratorDashboard() {
   const [workers, setWorkers] = useState<WorkerStatusInfo[]>([]);
   const [tasks, setTasks] = useState<TaskRunInfo[]>([]);
   const [queue, setQueue] = useState<QueueMetrics | null>(null);
+  const [dbSummary, setDbSummary] = useState<{ task_counts: Record<string, number>; worker_counts: Record<string, number>; total_workers: number; active_workers: number } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [commandState, setCommandState] = useState<CommandState>({ loading: false, message: null, error: null });
 
   const fetchData = useCallback(async () => {
     try {
       setRefreshing(true);
-      const [workerData, taskData, queueData] = await Promise.all([
+      const [workerData, taskData, queueData, dbData] = await Promise.all([
         apiClient.getSystemWorkers(),
         apiClient.getRecentTaskRuns(25),
         apiClient.getQueueMetrics(),
+        apiClient.getDatabaseSummary(),
       ]);
       setWorkers(workerData);
       setTasks(taskData);
       setQueue(queueData);
+      setDbSummary(dbData);
     } catch (error) {
       console.error("Failed to fetch orchestrator data", error);
     } finally {
@@ -158,6 +161,40 @@ export default function OrchestratorDashboard() {
               <p className="text-base text-gray-900">
                 {queue?.last_scheduled_at ? new Date(queue.last_scheduled_at).toLocaleTimeString() : "Not available"}
               </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Database Snapshot</h2>
+          <p className="text-sm text-gray-600 mb-4">Current state of orchestrator tables (counts by status).</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="border rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Workers</h3>
+              <p className="text-3xl font-semibold text-gray-900 mt-2">{dbSummary?.active_workers ?? 0}</p>
+              <p className="text-xs text-gray-500">Active workers (total: {dbSummary?.total_workers ?? 0})</p>
+              <ul className="mt-3 space-y-1 text-sm text-gray-600">
+                {Object.entries(dbSummary?.worker_counts ?? {}).map(([status, count]) => (
+                  <li key={status} className="flex justify-between">
+                    <span className="capitalize">{status}</span>
+                    <span>{count}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="border rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Task Runs</h3>
+              <ul className="mt-2 space-y-1 text-sm text-gray-600">
+                {Object.entries(dbSummary?.task_counts ?? {}).map(([status, count]) => (
+                  <li key={status} className="flex justify-between">
+                    <span className="capitalize">{status}</span>
+                    <span>{count}</span>
+                  </li>
+                ))}
+                {dbSummary && Object.keys(dbSummary.task_counts).length === 0 && (
+                  <li className="text-gray-500">No task history recorded yet.</li>
+                )}
+              </ul>
             </div>
           </div>
         </section>

@@ -65,8 +65,17 @@ RATP Live Tracker
 
 ### Prerequisites
 - Docker 24+
-- docker-compose 1.29+ (or `docker compose` plugin)
+- Docker Compose v2 plugin (`docker compose`)
 - Git
+
+> **Tip**
+> On Ubuntu/Debian you can install the plugin with:
+> ```bash
+> sudo install -m 0755 -d /etc/apt/keyrings
+> curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+> echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list
+> sudo apt-get update && sudo apt-get install docker-compose-plugin
+> ```
 
 ### One-command stack (recommended)
 
@@ -117,11 +126,11 @@ If you prefer a local Python/Node workflow you can still run the services by han
    ```
 
 3. **Kafka/worker orchestration**  
-  Optionally export `SCHEDULER_LINES="metro:1,rer:A"` (or any subset) before `docker-compose up kafka db scheduler worker` if you only want a few lines while developing; by default the scheduler now targets every supported line.
+  Optionally export `SCHEDULER_LINES="metro:1,rer:A"` (or any subset) before `docker compose up kafka db scheduler worker` if you only want a few lines while developing; by default the scheduler now targets every supported line.
 
 ### Dev helpers
 
-- `./serve.sh` – wrapper around `docker-compose` (`up`, `down`, `logs`, `restart`); starts backend, frontend, Kafka, scheduler, and worker containers. Use `./serve.sh up --workers 3` to scale the worker pool.
+- `./serve.sh` – wrapper around `docker compose` (`up`, `down`, `logs`, `restart`, `scale`); starts backend, frontend, Kafka, scheduler, and worker containers. The default pool uses `DEFAULT_WORKER_COUNT=16`, but you can pass `--workers N` or scale later from the dashboard (which calls `docker compose -p ratp ... --scale worker={count}` under the hood).
 - Optional: set `WORKER_SCALE_COMMAND="./serve.sh scale --workers {count}"` (adjust paths as needed) so the orchestrator dashboard can add/remove workers on demand. The API accepts either an absolute `count` or relative `delta`, and you can override the default pool size with `DEFAULT_WORKER_COUNT=16`.
 - `./scripts/stop_services.sh` – convenience wrapper that simply invokes `./serve.sh down` (accepts the same extra args).
 - `./scripts/run_tests.sh` – ensures the backend virtualenv exists, installs pytest if needed, and runs the backend unit test suite.

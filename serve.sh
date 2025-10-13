@@ -89,7 +89,7 @@ case "$ACTION" in
       exit 1
     fi
     echo "[serve] scaling worker service to ${desired_scale}"
-    "$COMPOSE_BIN" -f "${COMPOSE_FILE}" up -d --scale "worker=${desired_scale}" worker
+    "$COMPOSE_BIN" -f "${COMPOSE_FILE}" up -d --no-build --scale "worker=${desired_scale}" worker
     ;;
   *)
     cat <<EOF

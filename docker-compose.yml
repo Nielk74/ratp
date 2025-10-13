@@ -42,11 +42,16 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       VMTR_SOCKET_ENABLED: "True"
       SYSTEM_API_TOKEN: changeme
+      WORKER_SCALE_COMMAND: 'docker compose -p ratp -f /workspace/docker-compose.yml up -d --no-build --no-recreate --scale worker={count} worker'
+      WORKER_SCALE_WORKDIR: /workspace
     depends_on:
       - db
       - kafka
     ports:
       - "8000:8000"
+    volumes:
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
 
   scheduler:
     build:

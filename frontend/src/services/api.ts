@@ -12,6 +12,13 @@ import type {
   QueueMetrics,
 } from "@/types";
 
+interface DatabaseSummary {
+  task_counts: Record<string, number>;
+  worker_counts: Record<string, number>;
+  total_workers: number;
+  active_workers: number;
+}
+
 const DEFAULT_BACKEND_PORT = process.env.NEXT_PUBLIC_BACKEND_PORT || "8000";
 const SYSTEM_API_TOKEN = process.env.NEXT_PUBLIC_SYSTEM_API_KEY || "";
 
@@ -162,6 +169,11 @@ export const apiClient = {
 
   async getQueueMetrics(): Promise<QueueMetrics> {
     const { data } = await api.get("/api/system/queue");
+    return data;
+  },
+
+  async getDatabaseSummary(): Promise<DatabaseSummary> {
+    const { data } = await api.get("/api/system/db/summary");
     return data;
   },
 
