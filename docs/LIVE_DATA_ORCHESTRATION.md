@@ -64,7 +64,9 @@
 
 Implementation:
 - Python service using `aiokafka.AIOKafkaProducer`.
-- Configurable via env (`SCHEDULER_INTERVAL_SECONDS`, `SCHEDULER_LINES`, etc.).
+- Configurable via env (`SCHEDULER_INTERVAL_SECONDS`, `SCHEDULER_LINES`, `SCHEDULER_MAX_BACKLOG`, etc.).
+- Periodically expires long-idle `task_runs` rows and retries jobs that were mid-flight when a worker crashed, preventing backlog buildup.
+- Prunes stale `worker_status` entries by marking missing heartbeats as `lost` and deleting idle/stopped replicas whose heartbeats have fallen out of the safety window.
 - Runs as long-lived container (`scheduler` service in compose).
 
 ### Worker
@@ -74,9 +76,9 @@ Implementation:
 - Persists results into database tables:
   - `live_snapshots`: latest JSON snapshot per `(network,line)` including metadata.
   - `live_departures`: optional table for per-station departures (for historical tracking).
-  - `task_runs`: job history with status, latency, error message.
-  - `worker_heartbeats`: worker_id, last_seen_at, cpu/mem stats, assigned partitions.
-- Emits heartbeat & metrics to Kafka `worker.metrics` (consumed by backend).
+  - `task_runs`: job history with status, latency, error message. Includes `expired` for tasks that aged out and `skipped` when a line snapshot is intentionally bypassed.
+  - `worker_heartbeats`: worker_id, last_seen_at, cpu/mem stats, assigned partitions. Workers that vanish mid-run are marked `lost` during scheduler maintenance.
+- Emits heartbeat & metrics to Kafka `worker.metrics` (consumed by backend) and removes its own `worker_status` row on shutdown so the fleet list stays clean.
 - Responds to control commands (`PAUSE`, `RESUME`, `REBAlANCE`) via `control.commands`.
 
 Scaling:

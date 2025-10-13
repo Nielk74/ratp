@@ -13,11 +13,11 @@ from typing import Iterable, List, Tuple, Optional
 
 from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
 from aiokafka.errors import KafkaConnectionError
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, delete, func
 
 from ..config import settings as app_settings
 from ..database import AsyncSessionLocal, init_db
-from ..models import TaskRun
+from ..models import TaskRun, WorkerStatus
 from ..services.ratp_client import RatpClient
 from .settings import OrchestratorSettings
 
@@ -64,21 +64,66 @@ async def _persist_task(session, job: dict) -> None:
 
 
 async def _mark_stale_tasks(session) -> None:
-    """Set long-running tasks back to queued so they are retried."""
-    cutoff = datetime.now(timezone.utc) - timedelta(seconds=app_settings.task_timeout_seconds * 2)
-    stmt = update(TaskRun).where(TaskRun.status == "running").where(TaskRun.started_at < cutoff).values(
-        status="queued",
-        started_at=None,
-        finished_at=None,
+    """Make sure stuck tasks move back to the queue or are expired."""
+    now = datetime.now(timezone.utc)
+    retry_cutoff = now - timedelta(seconds=app_settings.task_timeout_seconds * 2)
+    expire_cutoff = now - timedelta(seconds=max(app_settings.task_timeout_seconds * 6, 300))
+
+    # Tasks that started but never finished should be retried.
+    retry_stmt = (
+        update(TaskRun)
+        .where(TaskRun.status == "running")
+        .where(TaskRun.started_at < retry_cutoff)
+        .values(
+            status="queued",
+            scheduled_at=now,
+            started_at=None,
+            finished_at=None,
+        )
+    )
+    # Tasks that sat queued for too long likely lost their Kafka payload; expire them.
+    expire_stmt = (
+        update(TaskRun)
+        .where(TaskRun.status.in_(["queued", "pending"]))
+        .where(TaskRun.scheduled_at < expire_cutoff)
+        .values(
+            status="expired",
+            finished_at=now,
+        )
     )
     try:
-        await session.execute(stmt)
+        await session.execute(retry_stmt)
+        await session.execute(expire_stmt)
     except Exception:  # pylint: disable=broad-except
         pass
 
 
+async def _prune_stale_workers(session, orchestrator_settings: OrchestratorSettings) -> None:
+    """Remove worker records that have not sent heartbeats recently."""
+    heartbeat_window = orchestrator_settings.worker_heartbeat_interval * 6
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=max(heartbeat_window, 30))
+
+    # Mark running workers that have gone missing as lost.
+    mark_lost_stmt = (
+        update(WorkerStatus)
+        .where(WorkerStatus.status == "running")
+        .where(WorkerStatus.last_heartbeat < cutoff)
+        .values(status="lost")
+    )
+    await session.execute(mark_lost_stmt)
+
+    # Delete idle/stopped workers whose heartbeat is stale.
+    delete_stmt = (
+        delete(WorkerStatus)
+        .where(WorkerStatus.status.in_(["idle", "paused", "stopped", "lost"]))
+        .where(WorkerStatus.last_heartbeat < cutoff)
+    )
+    await session.execute(delete_stmt)
+
+
 async def scheduler_loop() -> None:
     orchestrator_settings = OrchestratorSettings()
+    await init_db()
     targets = _resolve_targets(orchestrator_settings)
     if not targets:
         logger.warning("Scheduler has no targets configured; exiting.")
@@ -146,6 +191,7 @@ async def scheduler_loop() -> None:
             now = datetime.now(timezone.utc)
             async with AsyncSessionLocal() as session:
                 await _mark_stale_tasks(session)
+                await _prune_stale_workers(session, orchestrator_settings)
                 backlog_stmt = (
                     select(func.count())
                     .select_from(TaskRun)

@@ -32,7 +32,8 @@ class OrchestratorSettings:
     kafka_metrics_topic: str = os.getenv("KAFKA_METRICS_TOPIC", "worker.metrics")
 
     scheduler_interval_seconds: int = int(os.getenv("SCHEDULER_INTERVAL_SECONDS", "120"))
-    scheduler_lines_raw: str = os.getenv("SCHEDULER_LINES", "")
+    scheduler_lines_raw: str = os.getenv("SCHEDULER_LINES", "metro:1,rer:A")
+    scheduler_max_backlog: int = int(os.getenv("SCHEDULER_MAX_BACKLOG", "64"))
     scheduler_batch_size: int = int(os.getenv("SCHEDULER_BATCH_SIZE", "25"))
 
     worker_id: str = os.getenv("WORKER_ID", "")

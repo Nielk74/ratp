@@ -15,7 +15,7 @@ from typing import Any, Dict, Optional
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from aiokafka.errors import KafkaConnectionError
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
 from ..config import settings as app_settings
 from ..database import AsyncSessionLocal, init_db
@@ -60,6 +60,8 @@ class Worker:
             now = datetime.now(timezone.utc)
             if record:
                 record.status = status
+                if status == "starting":
+                    record.started_at = now
                 record.last_heartbeat = now
                 if metrics:
                     record.update_metrics(metrics)
@@ -239,6 +241,12 @@ class Worker:
             await self._emit_metrics({"event": "heartbeat", "status": status})
             await asyncio.sleep(self.settings.worker_heartbeat_interval)
 
+    async def _remove_worker_status(self) -> None:
+        async with db_session() as session:
+            await session.execute(
+                delete(WorkerStatus).where(WorkerStatus.worker_id == self.worker_id)
+            )
+
     async def run(self) -> None:
         await init_db()
 
@@ -299,6 +307,7 @@ class Worker:
             await self._consumer.stop()
             await self._producer.stop()
             await self._update_worker_status("stopped")
+            await self._remove_worker_status()
 
 
 def main() -> None:
