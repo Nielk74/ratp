@@ -1,75 +1,56 @@
-# 🚇 RATP Live Tracker
+# RATP Live Tracker
 
-Real-time monitoring system for Paris public transport (RATP) with live traffic updates, incident alerts, geolocation-based stop suggestions, and predictive forecasting.
+RATP Live Tracker provides real-time traffic, line snapshots, and orchestration tools for the Paris public transport network. The stack combines a FastAPI backend, a Kafka-backed scheduling system, and a Next.js dashboard to keep line data fresh and accessible.
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.109.0-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
-[![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite)](https://sqlite.org)
-[![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=next.js)](https://nextjs.org)
+## Table of Contents
+1. [Key Features](#key-features)
+2. [Architecture Overview](#architecture-overview)
+3. [Quick Start](#quick-start)
+4. [Development Workflow](#development-workflow)
+5. [Orchestrator Dashboard](#orchestrator-dashboard)
+6. [API Overview](#api-overview)
+7. [Testing](#testing)
+8. [Project Structure](#project-structure)
 
----
+## Key Features
 
-## 🎯 Features
+### Backend
+- Live traffic scraper for ratp.fr with caching safeguards.
+- Line snapshot service combining IDFM open data with optional VMTR websocket feeds.
+- Kafka-backed scheduler/worker fleet with task retry, stale worker pruning, and snapshot persistence.
+- Discord webhook management with confirmation workflow.
+- Rich system endpoints (`/api/system/*`) exposing queue metrics, worker controls, and database summaries for observability.
 
-### ✅ Backend Highlights
-- **Live Traffic Status** scraped from ratp.fr traffic endpoints via an emulated browser session with caching
-- **Snapshot API**: Stations derived from IDFM open-data plus optional VMTR websocket vehicle feeds, with metadata to surface live vs inferred data
-- **Multi-network Line Catalogue** (Metro, RER, Tram, Transilien) enriched with IDFM open-data stations
-- **Discord Webhooks** with confirmation messages and CRUD endpoints
-- **Geolocation & Utilities**: nearest-station search, in-memory cache, typed configuration
-- **Automated Tests**: 48 passes covering services, models, and REST contracts
-- **Background Orchestrator**: Kafka-backed scheduler + worker fleet keeping live data and traffic snapshots fresh, with automatic task expiry and worker heartbeat pruning. Scaling controls are exposed in the admin dashboard when `WORKER_SCALE_COMMAND` is configured (see [`docs/LIVE_DATA_ORCHESTRATION.md`](docs/LIVE_DATA_ORCHESTRATION.md))
+### Frontend
+- Next.js 14 dashboard with network filters, line detail views, and real-time refresh loops.
+- Orchestrator admin panel showing queue metrics, worker status, database snapshot, and scaling controls.
+- Discord webhook UI for creating, listing, and deleting alerts.
+- Geolocation widget to surface nearby stations.
 
-> ℹ️ _True vehicle locations and mission ETAs need IDFM SIRI/GTFS-RT access. See the “Real-Time Train Position Plan” in `plan.md` for activation steps._
-
-### ✅ Frontend Highlights
-- **Network Toggles** to switch between Metro / RER / Tram / Transilien views
-- **Line Details Panel** with ordered station list and VMTR-driven train markers (falls back to empty data when websocket disabled)
-- **Discord Webhook Manager** page for creating, listing, and deleting alerts
-- **Nearest Stations Widget** with client-side geolocation
-- **Responsive Next.js 14 UI** refreshing data every two minutes
-
-### 🚧 Coming Soon
-- **Interactive Map** once official GTFS geometry & vehicle feeds are unlocked
-- **Live Train Positions & Forecasts** using SIRI StopMonitoring or GTFS-RT vehicle data (pending IDFM approval)
-- **Historical analytics** and reliability metrics based on stored vehicle snapshots
-- **Mobile companion apps** once the API surface settles
-
----
-
-## 🏗️ Architecture
+## Architecture Overview
 
 ```
 RATP Live Tracker
-├── backend/          FastAPI + SQLAlchemy + SQLite
-│   ├── api/          REST endpoints
-│   ├── models/       Database models
-│   ├── services/     RATP client, Discord, geolocation
-│   └── main.py       Application entry point
-├── frontend/         Next.js + React + TailwindCSS
-├── docs/            Documentation
-└── plan.md          Project roadmap & architecture
+├── backend/          FastAPI + SQLAlchemy + PostgreSQL
+│   ├── api/          REST endpoints (traffic, lines, webhooks, system)
+│   ├── models/       Database models and migrations
+│   ├── services/     Scrapers, clients, utilities
+│   └── workers/      Scheduler and Kafka consumer
+├── frontend/         Next.js + React + Tailwind CSS
+├── docs/             Documentation
+└── scripts/          Helper scripts (testing, orchestration, e2e)
 ```
 
-### APIs & Data Sources
-- **ratp.fr traffic endpoints** – official public site scraped with shared session cookies
-- **VMTR Websocket** – live vehicle positions for lines with public feeds
-- **IDFM Open Data** – station catalogue (`arrets-lignes`) and line references
-- **Île-de-France Mobilités Open Data** – station catalogue (`arrets-lignes`) and line references
-- **PRIM Navitia** – optional departures feed (requires API key, disabled by default)
-- **Community RATP API** – legacy fallback (currently unreliable)
+Data sources include ratp.fr traffic pages, VMTR websocket feeds, and IDFM open datasets. The Kafka topic graph connects the scheduler (producer), workers (consumers), and the backend (metrics/monitoring).
 
----
-
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Docker 24+
 - Docker Compose v2 plugin (`docker compose`)
 - Git
 
-> **Tip**
-> On Ubuntu/Debian you can install the plugin with:
+> **Install Docker Compose v2 on Ubuntu/Debian**
 > ```bash
 > sudo install -m 0755 -d /etc/apt/keyrings
 > curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
@@ -77,273 +58,147 @@ RATP Live Tracker
 > sudo apt-get update && sudo apt-get install docker-compose-plugin
 > ```
 
-### One-command stack (recommended)
+### One-command stack
 
 ```bash
 git clone https://github.com/Nielk74/ratp.git
 cd ratp
-./serve.sh up          # builds images and starts all services (defaults to metro 1 & RER A)
+./serve.sh up
 ```
 
-Once the containers are up:
-- Frontend dashboard: http://localhost:3000
-- Orchestrator admin (queue + workers): http://localhost:3000/admin/orchestrator
-- Backend API docs: http://localhost:8000/docs
+When the stack is healthy:
+- Dashboard: http://localhost:3000
+- Orchestrator admin: http://localhost:3000/admin/orchestrator
+- API docs: http://localhost:8000/docs
 
-Tail logs with:
+Useful helpers:
 
 ```bash
-./serve.sh logs backend worker scheduler
+./serve.sh logs backend worker scheduler   # follow logs for core services
+./serve.sh down                            # tear everything down
 ```
 
-Stop everything:
+## Development Workflow
+
+### Manual backend/frontend setup (optional)
+
+Backend:
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+PYTHONPATH="$(pwd)/.." uvicorn backend.main:app --host 127.0.0.1 --port 8000
+```
+
+Frontend:
+```bash
+cd frontend
+npm install
+cp .env.local.example .env.local
+npm run dev -- --hostname 127.0.0.1 --port 3000
+```
+
+Kafka/worker development mode:
 
 ```bash
-./serve.sh down
+# Restrict to a subset of lines if needed (defaults to whole catalogue)
+export SCHEDULER_LINES="metro:1,rer:A"
+docker compose up kafka db scheduler worker
 ```
-
-### Manual development setup (optional)
-
-If you prefer a local Python/Node workflow you can still run the services by hand.
-
-1. **Backend**
-   ```bash
-   cd backend
-   python -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   cp .env.example .env
-   PYTHONPATH="$(pwd)/.." uvicorn backend.main:app --host 127.0.0.1 --port 8000
-   ```
-   API docs: http://127.0.0.1:8000/docs
-
-2. **Frontend**
-   ```bash
-   cd frontend
-   npm install
-   cp .env.local.example .env.local
-   npm run dev -- --hostname 127.0.0.1 --port 3000
-   ```
-
-3. **Kafka/worker orchestration**  
-  Optionally export `SCHEDULER_LINES="metro:1,rer:A"` (or any subset) before `docker compose up kafka db scheduler worker` if you only want a few lines while developing; by default the scheduler now targets every supported line.
 
 ### Dev helpers
+- `./serve.sh up --workers N` – start the stack with a custom worker pool (default `DEFAULT_WORKER_COUNT=16`).
+- `./serve.sh scale --workers N` – adjust the worker pool without rebuilding.
+- `./serve.sh logs …`, `./serve.sh restart …`, `./serve.sh down` – standard orchestration shortcuts.
+- `./scripts/run_tests.sh` – run backend unit tests in a reproducible venv.
+- `./scripts/run_e2e.sh` – execute the full stack with Playwright end-to-end tests.
 
-- `./serve.sh` – wrapper around `docker compose` (`up`, `down`, `logs`, `restart`, `scale`); starts backend, frontend, Kafka, scheduler, and worker containers. The default pool uses `DEFAULT_WORKER_COUNT=16`, but you can pass `--workers N` or scale later from the dashboard (which calls `docker compose -p ratp ... --scale worker={count}` under the hood).
-- Optional: set `WORKER_SCALE_COMMAND="./serve.sh scale --workers {count}"` (adjust paths as needed) so the orchestrator dashboard can add/remove workers on demand. The API accepts either an absolute `count` or relative `delta`, and you can override the default pool size with `DEFAULT_WORKER_COUNT=16`.
-- `./scripts/stop_services.sh` – convenience wrapper that simply invokes `./serve.sh down` (accepts the same extra args).
-- `./scripts/run_tests.sh` – ensures the backend virtualenv exists, installs pytest if needed, and runs the backend unit test suite.
-- `./scripts/check_m14_bibliotheque.sh` – calls the schedules endpoint for Metro 14 at Bibliothèque François-Mitterrand (direction configurable via `--direction`).
-- `./scripts/run_e2e.sh` – launches the stack, runs Playwright e2e specs, streams progress, and tears everything down (log tails on failure).
+## Orchestrator Dashboard
 
-### Running Tests
+The admin panel (http://localhost:3000/admin/orchestrator) consolidates operations data:
+
+- **Queue Overview**: pending task count, total scheduled tasks, latest scheduler run.
+- **Database Snapshot**: aggregated `task_runs` and `worker_status` counts sourced from `/api/system/db/summary`.
+- **Worker Fleet**: live worker list with heartbeat timestamps and metrics.
+- **Scaling Controls**: add/remove workers via the new `/api/system/workers/scale` endpoint (supports absolute `count` or relative `delta`). Under the hood the backend executes `docker compose -p ratp -f /workspace/docker-compose.yml up -d --no-build --no-recreate --scale worker={count} worker`.
+- **Recent Task Runs**: most recent history of orchestrator jobs with timing and error details.
+- **Control Plane**: pause/resume/drain worker commands and manual scheduler trigger.
+
+## API Overview
+
+### Lines and snapshots
+- `GET /api/lines` – list all networks, optionally filtered by `transport_type`.
+- `GET /api/lines/{type}/{code}` – full line definition with ordered stations.
+- `GET /api/snapshots/{network}/{line}` – latest persisted snapshot (via worker fleet).
+
+### Traffic
+- `GET /api/traffic/status` – normalized traffic feed with severity metadata.
+- `GET /api/traffic` – legacy raw traffic response (kept for compatibility).
+
+### Webhooks
+- `POST /api/webhooks` – create a Discord webhook subscription (sends confirmation message).
+- `GET /api/webhooks` – enumerate subscriptions.
+- `DELETE /api/webhooks/{id}` – remove a subscription.
+
+### Orchestrator/system endpoints
+- `GET /api/system/workers` – workers with status, host, heartbeat, metrics.
+- `GET /api/system/queue` – queued/pending counts and last scheduled timestamp.
+- `GET /api/system/tasks/recent` – most recent task run history.
+- `POST /api/system/workers/{id}/command` – send a control command (pause/resume/drain/reload).
+- `POST /api/system/workers/scale` – adjust worker pool (payload `{ "count": N }` or `{ "delta": ±N }`).
+- `POST /api/system/scheduler/run` – trigger scheduler immediately.
+- `GET /api/system/db/summary` – aggregate counts from `task_runs` and `worker_status`.
+
+## Testing
 
 ```bash
-# Backend tests (from backend/ directory)
+# Backend unit tests
+cd backend
 pytest
+
+# Coverage report
 pytest --cov=backend --cov-report=html
 
-# Frontend type checking
+# Frontend static checks
 cd frontend
 npm run type-check
 npm run lint
 ```
 
----
-
-## 📡 API Endpoints
-
-### Lines
-- `GET /api/lines` – List all networks (metro, rer, tram, transilien)
-- `GET /api/lines?transport_type=metro` – Filter by transport type
-- `GET /api/lines/{type}/{code}` – Detailed line payload (stations + VMTR-driven train markers when available)
-- `GET /api/snapshots/{network}/{line}` – Aggregated station data (IDFM stations + VMTR vehicles)
-- `GET /api/lines/{type}/{code}/stations` – Raw station feed for integrations
-
-### Traffic
-- `GET /api/traffic/status` – Normalised traffic overview with severity labels
-- `GET /api/traffic` – Legacy pass-through payload (kept for compatibility)
-- `GET /api/traffic?line_code=1` – Filter traffic response by specific line
-
-### Schedules *(pending external feed reliability)*
-- `GET /api/schedules/{type}/{line}/{station}/{direction}` – Routed to community API; currently unavailable until the feed returns
-
-### Geolocation
-- `GET /api/geo/nearest?lat=48.8566&lon=2.3522` – Find nearest stations to a coordinate
-
-### Webhooks
-- `POST /api/webhooks` – Create Discord alert subscription (sends confirmation message)
-- `GET /api/webhooks` – List active subscriptions
-- `DELETE /api/webhooks/{id}` – Remove a subscription
-- `POST /api/webhooks/test` – Send test notification
-
----
-
-## 🧪 Testing
+For full-stack validation run:
 
 ```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=backend --cov-report=html
-
-# Run specific test file
-pytest backend/tests/test_ratp_client.py
+./scripts/run_e2e.sh
 ```
 
-For full-stack + Playwright validation run `./scripts/run_e2e.sh` from the repo root (it spins up the stack, runs tests, and tears everything down).
+The script spins up the stack, runs Playwright tests, streams results, and tears everything down, preserving logs on failure.
 
----
-
-## 📦 Project Structure
+## Project Structure
 
 ```
-ratp/
-├── backend/
-│   ├── api/             # FastAPI routers (lines, traffic, schedules, geo, webhooks)
-│   ├── services/        # Integrations (ratp.fr traffic, IDFM open data, Discord, cache)
-│   ├── models/          # SQLAlchemy models & mixins
-│   ├── tests/           # pytest suite (48 tests)
-│   └── main.py          # Application entry point
-├── frontend/
-│   ├── src/
-│   │   ├── app/         # Dashboard & webhooks pages (Next.js App Router)
-│   │   ├── components/  # Header, TrafficStatus, LineDetailsPanel, ...
-│   │   ├── services/    # Axios client with dynamic host detection
-│   │   └── types/       # Shared TypeScript definitions
-├── plan.md              # Architecture & real-time roadmap
-├── DEPLOYMENT.md        # Deployment & environment guide
-└── README.md            # Project overview
+backend/
+├── api/                 # FastAPI routers (traffic, lines, system, webhooks)
+├── config.py            # Settings loader (env-driven)
+├── database.py          # Async session/engine helpers
+├── services/            # Scrapers, clients, utilities
+├── workers/             # Scheduler loop and Kafka worker
+├── tests/               # Backend pytest suite
+└── tmp/                 # Scratch space / captured payloads
+
+frontend/
+├── src/
+│   ├── app/             # Next.js routes (dashboard, orchestrator admin)
+│   ├── components/      # Shared UI components
+│   ├── services/        # API hooks and clients
+│   └── types/           # Shared TypeScript types
+└── tests/               # Playwright specs
+
+docs/                    # Detailed system design and operations notes
+scripts/                 # Utility scripts (orchestration, testing, helpers)
 ```
 
 ---
 
-## 🔧 Configuration
-
-All configuration is managed via environment variables in `.env`:
-
-```env
-# Application
-APP_NAME="RATP Live Tracker"
-ENVIRONMENT="development"
-DEBUG=True
-
-# Server
-HOST="0.0.0.0"
-PORT=8000
-
-# Database
-DATABASE_URL="sqlite+aiosqlite:///./ratp.db"
-
-# RATP / IDFM APIs
-PRIM_API_KEY=""  # Optional: Navitia departures fallback (disable by default)
-COMMUNITY_API_URL="https://api-ratp.pierre-grimaud.fr/v4"
-
-# Caching
-CACHE_TTL_TRAFFIC=120      # 2 minutes
-CACHE_TTL_SCHEDULES=30     # 30 seconds
-CACHE_TTL_STATIONS=86400   # 24 hours
-
-# Discord
-DISCORD_WEBHOOK_ENABLED=True
-DISCORD_RATE_LIMIT_SECONDS=60
-
-# Scrapers
-NAVITIA_SCRAPER_MODE=mock   # Use 'live' to hit Navitia (requires PRIM_API_KEY), 'mock' for offline tests
-VMTR_SOCKET_ENABLED=False   # Enable socket.io realtime fetch (requires internet)
-VMTR_SOCKET_URL="wss://api.vmtr.ratp.fr/socket.io/"
-
-# CORS
-CORS_ALLOW_ORIGINS="http://localhost:3000,http://localhost:3100"
-```
-
----
-
-## 🗺️ Roadmap
-
-See [plan.md](plan.md) for detailed roadmap.
-
-### Phase 1: Backend Foundation ✅ (COMPLETED)
-- [x] FastAPI setup
-- [x] Database models (SQLite)
-- [x] ratp.fr traffic scraper with caching
-- [x] REST endpoints (lines, traffic, schedules*, geo, webhooks)
-- [x] Discord webhooks service
-- [x] Geolocation service
-- [x] Comprehensive test suite (48 tests)
-
-### Phase 2: Frontend Foundation ✅ (COMPLETED)
-- [x] Next.js 14 application
-- [x] Network filters and line detail panel
-- [x] Webhook management UI
-- [x] Tailwind CSS styling & responsive design
-- [x] Geolocation nearest stations
-- [x] API client service
-
-> *Schedule endpoints remain dependent on the legacy community API; SIRI access is required for reliable live departures.*
-
-### Phase 3: Advanced Features (Next)
-- [ ] Interactive map with Leaflet
-- [ ] Webhook management UI
-- [ ] Real-time WebSocket updates
-- [ ] Enhanced error handling
-- [ ] Comprehensive logging
-
-### Phase 4: Advanced Features
-- [ ] Traffic forecasting with ML
-- [ ] Historical data analysis
-- [ ] Performance optimization
-
-### Phase 5: Testing & Deployment
-- [ ] Unit & integration tests
-- [ ] CI/CD pipeline
-- [ ] Docker deployment
-- [ ] Production monitoring
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these guidelines:
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feat/my-feature`
-3. Commit changes: `git commit -m "feat: add my feature"`
-4. Push to branch: `git push origin feat/my-feature`
-5. Open a pull request
-
-### Commit Convention
-```
-<type>(<scope>): <subject>
-
-Types: feat, fix, docs, style, refactor, test, chore
-Scopes: api, frontend, db, deploy, tests
-```
-
----
-
-## 📄 License
-
-This project is open source and available under the MIT License.
-
----
-
-## 🙏 Acknowledgments
-
-- **RATP**: Public transport operator of Paris
-- **Île-de-France Mobilités**: Regional transport authority
-- **Community Contributors**: Pierre Grimaud for the community RATP API
-
----
-
-## 📞 Support
-
-- **Documentation**: See [plan.md](plan.md) for architecture details
-- **Issues**: Open an issue on GitHub
-- **API Docs**: http://localhost:8000/docs (when running)
-
----
-
-**Built with ❤️ for Paris public transport users**
+Refer to [`docs/LIVE_DATA_ORCHESTRATION.md`](docs/LIVE_DATA_ORCHESTRATION.md) for in-depth coverage of the scheduler, worker fleet, database schema, and admin console workflows.`
