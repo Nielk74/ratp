@@ -117,7 +117,7 @@ If you prefer a local Python/Node workflow you can still run the services by han
    ```
 
 3. **Kafka/worker orchestration**  
-   Export `SCHEDULER_LINES="metro:1,rer:A"` (adjust as needed) and run `docker-compose up kafka db scheduler worker` so the background queue stays manageable while developing locally.
+  Optionally export `SCHEDULER_LINES="metro:1,rer:A"` (or any subset) before `docker-compose up kafka db scheduler worker` if you only want a few lines while developing; by default the scheduler now targets every supported line.
 
 ### Dev helpers
 

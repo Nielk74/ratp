@@ -65,6 +65,7 @@
 Implementation:
 - Python service using `aiokafka.AIOKafkaProducer`.
 - Configurable via env (`SCHEDULER_INTERVAL_SECONDS`, `SCHEDULER_LINES`, `SCHEDULER_MAX_BACKLOG`, etc.).
+- With no `SCHEDULER_LINES` set the scheduler enumerates every line from the RATP catalogue; provide filters when you need a narrower footprint.
 - Periodically expires long-idle `task_runs` rows and retries jobs that were mid-flight when a worker crashed, preventing backlog buildup.
 - Prunes stale `worker_status` entries by marking missing heartbeats as `lost` and deleting idle/stopped replicas whose heartbeats have fallen out of the safety window.
 - Runs as long-lived container (`scheduler` service in compose).
