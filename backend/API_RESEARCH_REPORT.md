@@ -437,7 +437,7 @@ The community RATP API (`api-ratp.pierre-grimaud.fr`) remains **unreachable** an
 
 **Status**: ✅ Traffic + station data implemented via ratp.fr; 🚧 train positions awaiting VMTR + SIRI alignment  
 **Next Step**: Keep refining the ratp.fr scraper resilience and pursue IDFM access for official realtime telemetry  
-**Documentation**: See `plan.md` (Real-Time Train Position Plan) and this report for historical context
+**Documentation**: See `docs/ROADMAP.md` (Real-Time Train Position Plan) and this report for historical context
 
 ---
 

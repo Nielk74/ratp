@@ -201,4 +201,8 @@ scripts/                 # Utility scripts (orchestration, testing, helpers)
 
 ---
 
-Refer to [`docs/LIVE_DATA_ORCHESTRATION.md`](docs/LIVE_DATA_ORCHESTRATION.md) for in-depth coverage of the scheduler, worker fleet, database schema, and admin console workflows.`
+Further reading:
+
+- [`docs/OPERATIONS.md`](docs/OPERATIONS.md) – operations guide, deployment tips, troubleshooting.
+- [`docs/LIVE_DATA_ORCHESTRATION.md`](docs/LIVE_DATA_ORCHESTRATION.md) – scheduler and worker internals.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) – current status and upcoming milestones.
