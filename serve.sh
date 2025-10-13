@@ -18,6 +18,7 @@ fi
 ACTION="${1:-up}"
 shift || true
 
+DEFAULT_WORKER_COUNT="${DEFAULT_WORKER_COUNT:-16}"
 WORKER_SCALE=""
 declare -a EXTRA_ARGS=()
 
@@ -51,8 +52,9 @@ case "$ACTION" in
   up)
     echo "[serve] starting orchestrator stack (backend, frontend, kafka, workers)"
     compose_args=("-f" "${COMPOSE_FILE}" "up" "-d" "--build")
-    if [[ -n "$WORKER_SCALE" ]]; then
-      compose_args+=("--scale" "worker=${WORKER_SCALE}")
+    desired_scale="${WORKER_SCALE:-$DEFAULT_WORKER_COUNT}"
+    if [[ -n "$desired_scale" ]]; then
+      compose_args+=("--scale" "worker=${desired_scale}")
     fi
     compose_args+=("${EXTRA_ARGS[@]}")
     "$COMPOSE_BIN" "${compose_args[@]}"
@@ -73,11 +75,21 @@ case "$ACTION" in
   restart)
     "$COMPOSE_BIN" -f "${COMPOSE_FILE}" down
     compose_args=("-f" "${COMPOSE_FILE}" "up" "-d")
-    if [[ -n "$WORKER_SCALE" ]]; then
-      compose_args+=("--scale" "worker=${WORKER_SCALE}")
+    desired_scale="${WORKER_SCALE:-$DEFAULT_WORKER_COUNT}"
+    if [[ -n "$desired_scale" ]]; then
+      compose_args+=("--scale" "worker=${desired_scale}")
     fi
     compose_args+=("${EXTRA_ARGS[@]}")
     "$COMPOSE_BIN" "${compose_args[@]}"
+    ;;
+  scale)
+    desired_scale="${WORKER_SCALE:-$DEFAULT_WORKER_COUNT}"
+    if [[ -z "$desired_scale" ]]; then
+      echo "[serve] error: no worker count provided (use --workers N or set DEFAULT_WORKER_COUNT)"
+      exit 1
+    fi
+    echo "[serve] scaling worker service to ${desired_scale}"
+    "$COMPOSE_BIN" -f "${COMPOSE_FILE}" up -d --scale "worker=${desired_scale}" worker
     ;;
   *)
     cat <<EOF
@@ -87,6 +99,7 @@ Commands:
   up [services...]       Start the full stack in detached mode (default).
   down                   Stop and remove containers.
   restart [services...]  Restart the stack.
+  scale                  Scale the worker service (uses --workers N or DEFAULT_WORKER_COUNT).
   logs [services...]     Tail container logs.
 
 Options:

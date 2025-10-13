@@ -68,7 +68,7 @@ Implementation:
 - Periodically expires long-idle `task_runs` rows and retries jobs that were mid-flight when a worker crashed, preventing backlog buildup.
 - Prunes stale `worker_status` entries by marking missing heartbeats as `lost` and deleting idle/stopped replicas whose heartbeats have fallen out of the safety window.
 - Runs as long-lived container (`scheduler` service in compose).
-- Exposes a scaling command hook (`WORKER_SCALE_COMMAND`) that the admin dashboard can call to add/remove workers (e.g., `docker compose up -d --scale worker={count} worker`).
+- Exposes a scaling command hook (`WORKER_SCALE_COMMAND`) that the admin dashboard can call to add/remove workers (e.g., `./serve.sh scale --workers {count}`).
 
 ### Worker
 - Python async consumer using `aiokafka.AIOKafkaConsumer`.
@@ -102,7 +102,7 @@ Scaling:
 - Sections:
   1. **Queue Overview**: tasks pending, throughput, oldest lag.
   2. **Worker Fleet**: table with status (Healthy, Behind, Down), last heartbeat, host info.
-  3. **Scaling Controls**: add/remove worker buttons wired to `WORKER_SCALE_COMMAND`.
+  3. **Scaling Controls**: add/remove worker buttons wired to `WORKER_SCALE_COMMAND` (defaults to `./serve.sh scale --workers {count}`; `DEFAULT_WORKER_COUNT` controls the base target).
   4. **Recent Task Runs**: success/error timeline with filters.
   5. **Controls**: buttons (`Pause`, `Resume`, `Rebalance`, `Requeue failed tasks`), trigger API calls.
   6. **Scheduler Status**: last tick time, next run, manual “Run now”.

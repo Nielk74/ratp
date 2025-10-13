@@ -122,7 +122,7 @@ If you prefer a local Python/Node workflow you can still run the services by han
 ### Dev helpers
 
 - `./serve.sh` – wrapper around `docker-compose` (`up`, `down`, `logs`, `restart`); starts backend, frontend, Kafka, scheduler, and worker containers. Use `./serve.sh up --workers 3` to scale the worker pool.
-- Optional: set `WORKER_SCALE_COMMAND="/usr/bin/docker compose -f docker-compose.yml up -d --scale worker={count} worker"` (adjust paths as needed) so the orchestrator dashboard can add/remove workers on demand.
+- Optional: set `WORKER_SCALE_COMMAND="./serve.sh scale --workers {count}"` (adjust paths as needed) so the orchestrator dashboard can add/remove workers on demand. Override the default pool size with `DEFAULT_WORKER_COUNT=16`.
 - `./scripts/stop_services.sh` – convenience wrapper that simply invokes `./serve.sh down` (accepts the same extra args).
 - `./scripts/run_tests.sh` – ensures the backend virtualenv exists, installs pytest if needed, and runs the backend unit test suite.
 - `./scripts/check_m14_bibliotheque.sh` – calls the schedules endpoint for Metro 14 at Bibliothèque François-Mitterrand (direction configurable via `--direction`).
