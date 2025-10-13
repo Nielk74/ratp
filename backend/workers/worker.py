@@ -16,6 +16,7 @@ from typing import Any, Dict, Optional
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from aiokafka.errors import KafkaConnectionError
 from sqlalchemy import select, delete
+from sqlalchemy.exc import IntegrityError
 
 from ..config import settings as app_settings
 from ..database import AsyncSessionLocal, init_db
@@ -133,23 +134,51 @@ class Worker:
             return
 
         started_at = datetime.now(timezone.utc)
-        async with db_session() as session:
-            stmt = select(TaskRun).where(TaskRun.job_id == job_id)
-            result = await session.execute(stmt)
-            task_run = result.scalar_one_or_none()
-            if task_run is None:
-                task_run = TaskRun(
-                    job_id=job_id,
-                    network=network,
-                    line=line,
-                    status="running",
-                    scheduled_at=started_at,
-                    context=job.get("metadata") or {},
-                )
-                session.add(task_run)
-            task_run.status = "running"
-            task_run.worker_id = self.worker_id
-            task_run.started_at = started_at
+        metadata = job.get("metadata") or {}
+
+        def _parse_scheduled_at() -> datetime:
+            scheduled_raw = job.get("scheduled_at")
+            if not scheduled_raw:
+                return started_at
+            if isinstance(scheduled_raw, datetime):
+                return scheduled_raw
+            if isinstance(scheduled_raw, str):
+                try:
+                    return datetime.fromisoformat(scheduled_raw)
+                except ValueError:
+                    return started_at
+            return started_at
+
+        scheduled_at = _parse_scheduled_at()
+
+        for attempt in range(2):
+            try:
+                async with db_session() as session:
+                    stmt = select(TaskRun).where(TaskRun.job_id == job_id)
+                    result = await session.execute(stmt)
+                    task_run = result.scalar_one_or_none()
+                    if task_run is None:
+                        task_run = TaskRun(
+                            job_id=job_id,
+                            network=network,
+                            line=line,
+                            status="running",
+                            scheduled_at=scheduled_at,
+                            context=metadata,
+                        )
+                        session.add(task_run)
+                    task_run.status = "running"
+                    task_run.worker_id = self.worker_id
+                    task_run.started_at = started_at
+                    task_run.finished_at = None
+                    task_run.error_message = None
+                    task_run.context = metadata
+                break
+            except IntegrityError:
+                logger.debug("Retrying task metadata update for %s after integrity error (attempt %s)", job_id, attempt + 1)
+                await asyncio.sleep(0)
+        else:
+            raise RuntimeError(f"Unable to record task run for job {job_id}")
 
         status = "success"
         error_message = None
