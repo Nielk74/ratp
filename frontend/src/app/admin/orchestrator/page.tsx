@@ -69,21 +69,20 @@ export default function OrchestratorDashboard() {
 
   const handleScale = useCallback(
     async (delta: number) => {
-      const target = Math.max(0, workers.length + delta);
-      if (target === workers.length) {
+      if (delta === 0) {
         return;
       }
       try {
         setCommandState({ loading: true, message: null, error: null });
-        await apiClient.scaleWorkers(target);
-        setCommandState({ loading: false, message: `Scaled worker pool to ${target}`, error: null });
+        const response = await apiClient.scaleWorkers({ delta });
+        setCommandState({ loading: false, message: `Scaled worker pool to ${response.count}`, error: null });
         await fetchData();
       } catch (error) {
         console.error(error);
         setCommandState({ loading: false, message: null, error: "Unable to scale workers" });
       }
     },
-    [fetchData, workers.length],
+    [fetchData],
   );
 
   useEffect(() => {

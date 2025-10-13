@@ -103,7 +103,7 @@ Scaling:
 - Sections:
   1. **Queue Overview**: tasks pending, throughput, oldest lag.
   2. **Worker Fleet**: table with status (Healthy, Behind, Down), last heartbeat, host info.
-  3. **Scaling Controls**: add/remove worker buttons wired to `WORKER_SCALE_COMMAND` (defaults to `./serve.sh scale --workers {count}`; `DEFAULT_WORKER_COUNT` controls the base target).
+  3. **Scaling Controls**: add/remove worker buttons wired to `WORKER_SCALE_COMMAND` (defaults to `./serve.sh scale --workers {count}`; `DEFAULT_WORKER_COUNT` controls the base target). The backend accepts either an absolute `count` or relative `delta`, so the UI can spawn additional workers regardless of the current pool size.
   4. **Recent Task Runs**: success/error timeline with filters.
   5. **Controls**: buttons (`Pause`, `Resume`, `Rebalance`, `Requeue failed tasks`), trigger API calls.
   6. **Scheduler Status**: last tick time, next run, manual “Run now”.

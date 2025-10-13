@@ -251,3 +251,27 @@ async def test_scale_workers_runs_command(monkeypatch, client: AsyncClient):
     payload = response.json()
     assert payload["count"] == 3
     assert payload["stdout"] == "3"
+
+
+@pytest.mark.asyncio
+async def test_scale_workers_delta(monkeypatch, client: AsyncClient):
+    """Scaling with a delta should derive the absolute target from worker status."""
+    from backend.config import settings as app_settings
+
+    monkeypatch.setattr(app_settings, "worker_scale_command", "/bin/echo {count}")
+    monkeypatch.setattr(app_settings, "worker_scale_workdir", ".")
+
+    response = await client.post("/api/system/workers/scale", json={"delta": 2})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 2
+    assert payload["stdout"] == "2"
+
+
+@pytest.mark.asyncio
+async def test_scale_workers_validation(client: AsyncClient):
+    """Scaling without count or delta should fail validation."""
+    response = await client.post("/api/system/workers/scale", json={})
+
+    assert response.status_code == 422

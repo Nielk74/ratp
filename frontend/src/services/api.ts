@@ -175,7 +175,8 @@ export const apiClient = {
     await api.post("/api/system/scheduler/run", null);
   },
 
-  async scaleWorkers(count: number): Promise<void> {
-    await api.post("/api/system/workers/scale", { count });
+  async scaleWorkers(payload: { count?: number; delta?: number }): Promise<{ count: number }> {
+    const { data } = await api.post("/api/system/workers/scale", payload);
+    return { count: data.count };
   },
 };

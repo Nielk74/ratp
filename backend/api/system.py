@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,7 +45,14 @@ async def _send_control_command(payload: Dict[str, Any]) -> None:
 class WorkerScaleRequest(BaseModel):
     """Request payload for scaling the worker pool."""
 
-    count: int = Field(ge=0, description="Desired number of worker processes/containers.")
+    count: int | None = Field(default=None, ge=0, description="Absolute number of worker processes/containers.")
+    delta: int | None = Field(default=None, description="Relative change in worker count (positive or negative).")
+
+    @model_validator(mode="after")
+    def _ensure_value(self) -> "WorkerScaleRequest":  # type: ignore[override]
+        if self.count is None and self.delta is None:
+            raise ValueError("Either count or delta must be provided")
+        return self
 
 
 @router.get("/workers", dependencies=[Depends(_require_system_token)])
@@ -123,13 +130,24 @@ async def send_worker_command(worker_id: str, command: str) -> Dict[str, Any]:
 
 
 @router.post("/workers/scale", dependencies=[Depends(_require_system_token)])
-async def scale_workers(request: WorkerScaleRequest) -> Dict[str, Any]:
+async def scale_workers(request: WorkerScaleRequest, db: AsyncSession = Depends(get_db_session)) -> Dict[str, Any]:
     command_template = settings.worker_scale_command
     if not command_template:
         raise HTTPException(status_code=501, detail="Worker scaling command not configured")
 
+    if request.count is not None:
+        target = request.count
+    else:
+        active_stmt = (
+            select(func.count())
+            .select_from(WorkerStatus)
+            .where(~WorkerStatus.status.in_(["lost", "stopped"]))
+        )
+        active_count = (await db.execute(active_stmt)).scalar() or 0
+        target = max(0, active_count + (request.delta or 0))
+
     try:
-        command_parts = [segment.format(count=request.count) for segment in shlex.split(command_template)]
+        command_parts = [segment.format(count=target) for segment in shlex.split(command_template)]
     except KeyError as exc:
         raise HTTPException(status_code=500, detail=f"Invalid worker scaling command template: missing key {exc}") from exc
 
@@ -155,7 +173,7 @@ async def scale_workers(request: WorkerScaleRequest) -> Dict[str, Any]:
 
     return {
         "status": "ok",
-        "count": request.count,
+        "count": target,
         "stdout": stdout_text,
         "stderr": stderr_text,
     }
