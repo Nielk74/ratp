@@ -9,14 +9,14 @@ import shlex
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..database import get_db_session
-from ..models import TaskRun, WorkerStatus
+from ..models import LiveSnapshot, TaskRun, WorkerStatus
 
 router = APIRouter()
 logger = logging.getLogger("system")
@@ -232,3 +232,48 @@ async def database_summary(db: AsyncSession = Depends(get_db_session)) -> Dict[s
         "total_workers": total_workers,
         "active_workers": active_workers,
     }
+
+
+@router.get("/db/snapshots", dependencies=[Depends(_require_system_token)])
+async def database_snapshots(
+    limit: int = Query(20, ge=1, le=100),
+    network: Optional[str] = Query(default=None, description="Filter by network code (e.g. metro, rer)."),
+    line: Optional[str] = Query(default=None, description="Filter by line code."),
+    include_payload: bool = Query(default=False, description="Whether to include full payload JSON in the response."),
+    db: AsyncSession = Depends(get_db_session),
+) -> Dict[str, Any]:
+    stmt = select(LiveSnapshot).order_by(desc(LiveSnapshot.fetched_at))
+
+    if network:
+        stmt = stmt.where(LiveSnapshot.network == network.lower())
+    if line:
+        stmt = stmt.where(LiveSnapshot.line == line.upper())
+
+    stmt = stmt.limit(limit)
+    result = await db.execute(stmt)
+
+    items: List[Dict[str, Any]] = []
+    for record in result.scalars():
+        payload = record.payload if include_payload else None
+        station_count = None
+        if isinstance(record.payload, dict):
+            stations = record.payload.get("stations")
+            if isinstance(stations, list):
+                station_count = len(stations)
+
+        items.append(
+            {
+                "id": record.id,
+                "network": record.network,
+                "line": record.line,
+                "status": record.status,
+                "fetched_at": record.fetched_at.isoformat() if record.fetched_at else None,
+                "scheduler_run_id": record.scheduler_run_id,
+                "error_message": record.error_message,
+                "context": record.context or {},
+                "station_count": station_count,
+                "payload": payload,
+            }
+        )
+
+    return {"items": items}

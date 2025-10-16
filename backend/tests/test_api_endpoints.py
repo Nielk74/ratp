@@ -290,3 +290,31 @@ async def test_db_summary_endpoint(client: AsyncClient):
     assert "worker_counts" in data
     assert "total_workers" in data
     assert "active_workers" in data
+
+
+@pytest.mark.asyncio
+async def test_db_snapshots_endpoint(client: AsyncClient, test_db):
+    """Database snapshots endpoint should expose persisted worker results."""
+    from backend.models import LiveSnapshot
+
+    snapshot = LiveSnapshot(
+        network="metro",
+        line="1",
+        status="success",
+        payload={"stations": [{"name": "Station A"}, {"name": "Station B"}]},
+        context={"source": "test"},
+    )
+    test_db.add(snapshot)
+    await test_db.commit()
+
+    response = await client.get("/api/system/db/snapshots?include_payload=true")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "items" in data
+    assert len(data["items"]) == 1
+    item = data["items"][0]
+    assert item["network"] == "metro"
+    assert item["line"] == "1"
+    assert item["station_count"] == 2
+    assert item["payload"] is not None

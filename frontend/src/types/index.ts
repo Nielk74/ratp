@@ -152,6 +152,19 @@ export interface LineSnapshot {
   errors: string[];
 }
 
+export interface SnapshotRecord {
+  id: number;
+  network: string;
+  line: string;
+  status: string;
+  fetched_at?: string | null;
+  scheduler_run_id?: string | null;
+  error_message?: string | null;
+  context: Record<string, unknown>;
+  station_count?: number | null;
+  payload?: unknown;
+}
+
 export interface WorkerStatusInfo {
   worker_id: string;
   status: string;

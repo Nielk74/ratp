@@ -10,6 +10,7 @@ import type {
   WorkerStatusInfo,
   TaskRunInfo,
   QueueMetrics,
+  SnapshotRecord,
 } from "@/types";
 
 interface DatabaseSummary {
@@ -175,6 +176,21 @@ export const apiClient = {
   async getDatabaseSummary(): Promise<DatabaseSummary> {
     const { data } = await api.get("/api/system/db/summary");
     return data;
+  },
+
+  async getDatabaseSnapshots(options?: {
+    limit?: number;
+    network?: string;
+    line?: string;
+    includePayload?: boolean;
+  }): Promise<SnapshotRecord[]> {
+    const params: Record<string, unknown> = {};
+    if (options?.limit) params.limit = options.limit;
+    if (options?.network) params.network = options.network;
+    if (options?.line) params.line = options.line;
+    if (options?.includePayload) params.include_payload = options.includePayload;
+    const { data } = await api.get("/api/system/db/snapshots", { params });
+    return data.items ?? [];
   },
 
   async sendWorkerCommand(workerId: string, command: string): Promise<void> {

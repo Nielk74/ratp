@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiClient } from "@/services/api";
-import type { QueueMetrics, TaskRunInfo, WorkerStatusInfo } from "@/types";
+import type { QueueMetrics, SnapshotRecord, TaskRunInfo, WorkerStatusInfo } from "@/types";
 
 const COMMANDS = ["PAUSE", "RESUME", "DRAIN", "RELOAD_CONFIG"];
 
@@ -12,27 +12,46 @@ interface CommandState {
   error: string | null;
 }
 
+function formatPayloadPreview(payload: unknown, maxLength = 400): string {
+  if (payload === null || payload === undefined) {
+    return "No payload";
+  }
+  try {
+    const json = JSON.stringify(payload, null, 2);
+    if (json.length <= maxLength) {
+      return json;
+    }
+    return `${json.slice(0, maxLength)}...`;
+  } catch (error) {
+    console.error("Unable to format payload preview", error);
+    return "Unable to display payload";
+  }
+}
+
 export default function OrchestratorDashboard() {
   const [workers, setWorkers] = useState<WorkerStatusInfo[]>([]);
   const [tasks, setTasks] = useState<TaskRunInfo[]>([]);
   const [queue, setQueue] = useState<QueueMetrics | null>(null);
   const [dbSummary, setDbSummary] = useState<{ task_counts: Record<string, number>; worker_counts: Record<string, number>; total_workers: number; active_workers: number } | null>(null);
+  const [snapshots, setSnapshots] = useState<SnapshotRecord[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [commandState, setCommandState] = useState<CommandState>({ loading: false, message: null, error: null });
 
   const fetchData = useCallback(async () => {
     try {
       setRefreshing(true);
-      const [workerData, taskData, queueData, dbData] = await Promise.all([
+      const [workerData, taskData, queueData, dbData, snapshotData] = await Promise.all([
         apiClient.getSystemWorkers(),
         apiClient.getRecentTaskRuns(25),
         apiClient.getQueueMetrics(),
         apiClient.getDatabaseSummary(),
+        apiClient.getDatabaseSnapshots({ limit: 10, includePayload: true }),
       ]);
       setWorkers(workerData);
       setTasks(taskData);
       setQueue(queueData);
       setDbSummary(dbData);
+      setSnapshots(snapshotData);
     } catch (error) {
       console.error("Failed to fetch orchestrator data", error);
     } finally {
@@ -196,6 +215,61 @@ export default function OrchestratorDashboard() {
                 )}
               </ul>
             </div>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Worker Results</h2>
+          <p className="text-sm text-gray-600 mb-4">Latest persisted snapshots collected by the worker fleet.</p>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-gray-600">Line</th>
+                  <th className="px-4 py-2 text-left text-gray-600">Status</th>
+                  <th className="px-4 py-2 text-left text-gray-600">Fetched</th>
+                  <th className="px-4 py-2 text-left text-gray-600">Stations</th>
+                  <th className="px-4 py-2 text-left text-gray-600">Error</th>
+                  <th className="px-4 py-2 text-left text-gray-600">Payload</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {snapshots.map((snapshot) => (
+                  <tr key={snapshot.id}>
+                    <td className="px-4 py-2">
+                      <div className="font-medium text-gray-900">
+                        {snapshot.network} {snapshot.line}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Run: {snapshot.scheduler_run_id ?? "-"}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 capitalize text-gray-700">{snapshot.status}</td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {snapshot.fetched_at ? new Date(snapshot.fetched_at).toLocaleString() : "-"}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {typeof snapshot.station_count === "number" ? snapshot.station_count : "?"}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-red-600 whitespace-pre-line">
+                      {snapshot.error_message ?? ""}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-gray-700 whitespace-pre-wrap">
+                      <pre className="whitespace-pre-wrap break-words">
+                        {formatPayloadPreview(snapshot.payload)}
+                      </pre>
+                    </td>
+                  </tr>
+                ))}
+                {snapshots.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-6 text-center text-gray-500 text-sm">
+                      No snapshot results recorded yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </section>
 
