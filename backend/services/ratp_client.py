@@ -51,20 +51,15 @@ class RatpClient:
             {"code": "C", "name": "RER C", "type": "rer", "color": "#FCD946"},
             {"code": "D", "name": "RER D", "type": "rer", "color": "#00A651"},
             {"code": "E", "name": "RER E", "type": "rer", "color": "#C7007D"},
-            # Tram lines
+            # Tram lines (RATP-operated only)
             {"code": "T1", "name": "Noisy-le-Sec – Asnières – Gennevilliers", "type": "tram", "color": "#8DC63F"},
             {"code": "T2", "name": "Pont de Bezons – Porte de Versailles", "type": "tram", "color": "#0055A4"},
             {"code": "T3a", "name": "Pont du Garigliano – Porte de Vincennes", "type": "tram", "color": "#FF5A00"},
             {"code": "T3b", "name": "Porte de Vincennes – Porte d'Asnières", "type": "tram", "color": "#FF5A00"},
-            {"code": "T7", "name": "Villejuif – Athis-Mons", "type": "tram", "color": "#00AEEF"},
-            {"code": "T13", "name": "Saint-Cyr – Saint-Germain-en-Laye", "type": "tram", "color": "#6B2C91"},
-            # Transilien / SNCF
-            {"code": "H", "name": "Transilien H", "type": "transilien", "color": "#7ACCC8"},
-            {"code": "J", "name": "Transilien J", "type": "transilien", "color": "#0075C9"},
-            {"code": "L", "name": "Transilien L", "type": "transilien", "color": "#A2006D"},
-            {"code": "N", "name": "Transilien N", "type": "transilien", "color": "#00A86B"},
-            {"code": "P", "name": "Transilien P", "type": "transilien", "color": "#F1921D"},
-            {"code": "U", "name": "Transilien U", "type": "transilien", "color": "#5C2D91"},
+            {"code": "T5", "name": "Garges - Sarcelles – Marché de Saint-Denis", "type": "tram", "color": "#7E6DB0"},
+            {"code": "T6", "name": "Châtillon – Viroflay", "type": "tram", "color": "#E3051C"},
+            {"code": "T7", "name": "Villejuif – Athis-Mons", "type": "tram", "color": "#704B1C"},
+            {"code": "T8", "name": "Saint-Denis – Épinay-sur-Seine – Villetaneuse", "type": "tram", "color": "#8D653D"},
         ]
 
     async def _fetch_with_retry(

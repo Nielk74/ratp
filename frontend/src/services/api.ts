@@ -11,14 +11,9 @@ import type {
   TaskRunInfo,
   QueueMetrics,
   SnapshotRecord,
+  DatabaseSummary,
+  SystemLogEntry,
 } from "@/types";
-
-interface DatabaseSummary {
-  task_counts: Record<string, number>;
-  worker_counts: Record<string, number>;
-  total_workers: number;
-  active_workers: number;
-}
 
 const DEFAULT_BACKEND_PORT = process.env.NEXT_PUBLIC_BACKEND_PORT || "8000";
 const SYSTEM_API_TOKEN = process.env.NEXT_PUBLIC_SYSTEM_API_KEY || "";
@@ -190,6 +185,23 @@ export const apiClient = {
     if (options?.line) params.line = options.line;
     if (options?.includePayload) params.include_payload = options.includePayload;
     const { data } = await api.get("/api/system/db/snapshots", { params });
+    return data.items ?? [];
+  },
+
+  async getSystemLogs(options?: {
+    limit?: number;
+    service?: string;
+    level?: string;
+    search?: string;
+    since?: string;
+  }): Promise<SystemLogEntry[]> {
+    const params: Record<string, unknown> = {};
+    if (options?.limit) params.limit = options.limit;
+    if (options?.service) params.service = options.service;
+    if (options?.level) params.level = options.level;
+    if (options?.search) params.search = options.search;
+    if (options?.since) params.since = options.since;
+    const { data } = await api.get("/api/system/logs", { params });
     return data.items ?? [];
   },
 

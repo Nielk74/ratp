@@ -155,33 +155,33 @@ class IdfmReferenceClient:
         if key in self._line_cache:
             return self._line_cache[key]
 
-        params = [f"shortname_line='{line_code.upper()}'"]
-        filters = self._LINE_FILTERS.get(network.lower(), {})
-        for field, value in filters.items():
-            params.append(f"{field}='{value}'")
+        # Try exact case first (for lines like T3b where case matters), then uppercase fallback
+        for attempt_code in [line_code, line_code.upper()]:
+            params = [f"shortname_line='{attempt_code}'"]
+            filters = self._LINE_FILTERS.get(network.lower(), {})
+            for field, value in filters.items():
+                params.append(f"{field}='{value}'")
 
-        where_clause = " AND ".join(params)
-        response = self._session.get(
-            f"{self.BASE_URL}/referentiel-des-lignes/records",
-            params={"where": where_clause, "limit": 20},
-            timeout=20,
-        )
-        response.raise_for_status()
-        results = response.json().get("results", [])
+            where_clause = " AND ".join(params)
+            response = self._session.get(
+                f"{self.BASE_URL}/referentiel-des-lignes/records",
+                params={"where": where_clause, "limit": 20},
+                timeout=20,
+            )
+            response.raise_for_status()
+            results = response.json().get("results", [])
 
-        selected = self._select_line_candidate(network, results)
-        if not selected:
-            self._line_cache[key] = None
-            return None
+            selected = self._select_line_candidate(network, results)
+            if selected:
+                line_id = selected.get("id_line")
+                if line_id:
+                    value = line_id if line_id.startswith("IDFM:") else f"IDFM:{line_id}"
+                    self._line_cache[key] = value
+                    return value
 
-        line_id = selected.get("id_line")
-        if not line_id:
-            self._line_cache[key] = None
-            return None
-
-        value = line_id if line_id.startswith("IDFM:") else f"IDFM:{line_id}"
-        self._line_cache[key] = value
-        return value
+        # No results found
+        self._line_cache[key] = None
+        return None
 
     def get_stops_for_line(self, line_id: str) -> Dict[str, Dict[str, str]]:
         if line_id in self._stops_cache:

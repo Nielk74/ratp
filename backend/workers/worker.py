@@ -20,6 +20,7 @@ from sqlalchemy.exc import IntegrityError
 
 from ..config import settings as app_settings
 from ..database import AsyncSessionLocal, init_db
+from ..logging_utils import enable_centralized_logging, disable_centralized_logging
 from ..models import LiveSnapshot, TaskRun, WorkerStatus
 from ..services.scrapers.line_snapshot import line_snapshot_service
 from .settings import OrchestratorSettings
@@ -278,65 +279,69 @@ class Worker:
 
     async def run(self) -> None:
         await init_db()
-
-        async def _start_producer() -> AIOKafkaProducer:
-            while True:
-                try:
-                    producer = AIOKafkaProducer(
-                        bootstrap_servers=self.settings.kafka_bootstrap_servers,
-                        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-                    )
-                    await producer.start()
-                    return producer
-                except KafkaConnectionError as exc:
-                    logger.warning("Kafka not ready for producer: %s", exc)
-                    await asyncio.sleep(3)
-
-        async def _start_consumer() -> AIOKafkaConsumer:
-            while True:
-                try:
-                    consumer = AIOKafkaConsumer(
-                        self.settings.kafka_fetch_topic,
-                        bootstrap_servers=self.settings.kafka_bootstrap_servers,
-                        group_id="live-data-workers",
-                        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
-                        enable_auto_commit=True,
-                        auto_offset_reset="earliest",
-                        max_poll_records=self.settings.worker_batch_size,
-                    )
-                    await consumer.start()
-                    return consumer
-                except KafkaConnectionError as exc:
-                    logger.warning("Kafka not ready for consumer: %s", exc)
-                    await asyncio.sleep(3)
-
-        self._producer = await _start_producer()
-        self._consumer = await _start_consumer()
-
-        await self._update_worker_status("starting")
-        heartbeat_task = asyncio.create_task(self._heartbeat_loop())
-        control_task = asyncio.create_task(self._control_loop())
-
-        logger.info("Worker %s connected to Kafka", self.worker_id)
-
+        await enable_centralized_logging(f"worker:{self.worker_id}")
         try:
-            async for msg in self._consumer:
-                await self._paused.wait()
-                await self._process_job(msg.value)
-                if not self._running:
-                    break
-        except asyncio.CancelledError:
-            pass
+
+            async def _start_producer() -> AIOKafkaProducer:
+                while True:
+                    try:
+                        producer = AIOKafkaProducer(
+                            bootstrap_servers=self.settings.kafka_bootstrap_servers,
+                            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+                        )
+                        await producer.start()
+                        return producer
+                    except KafkaConnectionError as exc:
+                        logger.warning("Kafka not ready for producer: %s", exc)
+                        await asyncio.sleep(3)
+
+            async def _start_consumer() -> AIOKafkaConsumer:
+                while True:
+                    try:
+                        consumer = AIOKafkaConsumer(
+                            self.settings.kafka_fetch_topic,
+                            bootstrap_servers=self.settings.kafka_bootstrap_servers,
+                            group_id="live-data-workers",
+                            value_deserializer=lambda v: json.loads(v.decode("utf-8")),
+                            enable_auto_commit=True,
+                            auto_offset_reset="earliest",
+                            max_poll_records=self.settings.worker_batch_size,
+                        )
+                        await consumer.start()
+                        return consumer
+                    except KafkaConnectionError as exc:
+                        logger.warning("Kafka not ready for consumer: %s", exc)
+                        await asyncio.sleep(3)
+
+            self._producer = await _start_producer()
+            self._consumer = await _start_consumer()
+
+            await self._update_worker_status("starting")
+            heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+            control_task = asyncio.create_task(self._control_loop())
+
+            logger.info("Worker %s connected to Kafka", self.worker_id)
+
+            try:
+                async for msg in self._consumer:
+                    await self._paused.wait()
+                    await self._process_job(msg.value)
+                    if not self._running:
+                        break
+            except asyncio.CancelledError:
+                pass
+            finally:
+                self._running = False
+                self._paused.set()
+                control_task.cancel()
+                heartbeat_task.cancel()
+                await asyncio.gather(control_task, heartbeat_task, return_exceptions=True)
+                await self._consumer.stop()
+                await self._producer.stop()
+                await self._update_worker_status("stopped")
+                await self._remove_worker_status()
         finally:
-            self._running = False
-            self._paused.set()
-            control_task.cancel()
-            heartbeat_task.cancel()
-            await asyncio.gather(control_task, heartbeat_task, return_exceptions=True)
-            await self._consumer.stop()
-            await self._producer.stop()
-            await self._update_worker_status("stopped")
-            await self._remove_worker_status()
+            await disable_centralized_logging()
 
 
 def main() -> None:

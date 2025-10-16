@@ -125,6 +125,7 @@ The admin panel (http://localhost:3000/admin/orchestrator) consolidates operatio
 - **Scaling Controls**: add/remove workers via the new `/api/system/workers/scale` endpoint (supports absolute `count` or relative `delta`). Under the hood the backend executes `docker compose -p ratp -f /workspace/docker-compose.yml up -d --no-build --no-recreate --scale worker={count} worker`.
 - **Recent Task Runs**: most recent history of orchestrator jobs with timing and error details.
 - **Control Plane**: pause/resume/drain worker commands and manual scheduler trigger.
+- **Log Observatory**: `/admin/logs` surfaces centralized logs with search, severity filters, and time windows.
 
 ## API Overview
 
@@ -150,6 +151,7 @@ The admin panel (http://localhost:3000/admin/orchestrator) consolidates operatio
 - `POST /api/system/workers/scale` – adjust worker pool (payload `{ "count": N }` or `{ "delta": ±N }`).
 - `POST /api/system/scheduler/run` – trigger scheduler immediately.
 - `GET /api/system/db/summary` – aggregate counts from `task_runs` and `worker_status`.
+- `GET /api/system/logs` – query centralized logs by service, level, time, or text search.
 
 ## Testing
 

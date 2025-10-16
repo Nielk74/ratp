@@ -8,6 +8,7 @@ from .schedule import ScheduleHistory
 from .webhook import WebhookSubscription
 from .forecast import ForecastPrediction
 from .live_snapshot import LiveSnapshot, TaskRun, WorkerStatus
+from .system_log import SystemLog
 
 __all__ = [
     "Base",
@@ -21,4 +22,5 @@ __all__ = [
     "LiveSnapshot",
     "TaskRun",
     "WorkerStatus",
+    "SystemLog",
 ]

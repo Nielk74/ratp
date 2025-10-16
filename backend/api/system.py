@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..database import get_db_session
-from ..models import LiveSnapshot, TaskRun, WorkerStatus
+from ..models import LiveSnapshot, TaskRun, WorkerStatus, SystemLog
 
 router = APIRouter()
 logger = logging.getLogger("system")
@@ -124,6 +124,30 @@ async def recent_task_runs(
             }
         )
     return {"items": runs}
+
+
+@router.get("/logs", dependencies=[Depends(_require_system_token)])
+async def list_system_logs(
+    limit: int = Query(100, ge=1, le=500),
+    service: Optional[str] = Query(default=None, description="Filter by service name (e.g. backend, scheduler)."),
+    level: Optional[str] = Query(default=None, description="Filter by log level (INFO, ERROR, etc.)."),
+    search: Optional[str] = Query(default=None, description="Case-insensitive search across message and logger name."),
+    since: Optional[datetime] = Query(default=None, description="Return logs newer than the provided ISO timestamp."),
+    db: AsyncSession = Depends(get_db_session),
+) -> Dict[str, Any]:
+    stmt = select(SystemLog).order_by(desc(SystemLog.created_at)).limit(limit)
+    if service:
+        stmt = stmt.where(SystemLog.service == service)
+    if level:
+        stmt = stmt.where(func.upper(SystemLog.level) == level.upper())
+    if since:
+        stmt = stmt.where(SystemLog.created_at >= since)
+    if search:
+        pattern = f"%{search.strip()}%"
+        stmt = stmt.where(SystemLog.message.ilike(pattern) | SystemLog.logger_name.ilike(pattern))
+    result = await db.execute(stmt)
+    items = [entry.to_dict() for entry in result.scalars()]
+    return {"items": items}
 
 
 @router.get("/queue", dependencies=[Depends(_require_system_token)])

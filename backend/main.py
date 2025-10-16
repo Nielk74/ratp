@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from .config import settings
 from .database import init_db
 from .api import lines, traffic, schedules, geo, webhooks, snapshots, system
+from .logging_utils import enable_centralized_logging, disable_centralized_logging
 
 
 @asynccontextmanager
@@ -14,9 +15,11 @@ async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
     # Startup
     await init_db()
-    yield
-    # Shutdown
-    # Add cleanup logic here if needed
+    await enable_centralized_logging("backend")
+    try:
+        yield
+    finally:
+        await disable_centralized_logging()
 
 
 app = FastAPI(

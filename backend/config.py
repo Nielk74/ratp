@@ -40,7 +40,7 @@ class Settings:
     community_api_url: str = os.getenv("COMMUNITY_API_URL", "https://api-ratp.pierre-grimaud.fr/v4")
     navitia_scraper_mode: str = os.getenv("NAVITIA_SCRAPER_MODE", "live")
     vmtr_socket_url: str = os.getenv("VMTR_SOCKET_URL", "wss://api.vmtr.ratp.fr/socket.io/")
-    vmtr_socket_enabled: bool = os.getenv("VMTR_SOCKET_ENABLED", "False") == "True"
+    vmtr_socket_enabled: bool = os.getenv("VMTR_SOCKET_ENABLED", "True") == "True"
 
     # Queue & Workers
     kafka_bootstrap_servers: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
@@ -77,6 +77,9 @@ class Settings:
     # Logging
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
     log_format: str = os.getenv("LOG_FORMAT", "json")
+    centralized_logging_enabled: bool = os.getenv("CENTRALIZED_LOGGING_ENABLED", "True") == "True"
+    centralized_log_level: str = os.getenv("CENTRALIZED_LOG_LEVEL", log_level)
+    centralized_log_queue_size: int = int(os.getenv("CENTRALIZED_LOG_QUEUE_SIZE", "1000"))
 
     # Discord
     discord_webhook_enabled: bool = os.getenv("DISCORD_WEBHOOK_ENABLED", "True") == "True"

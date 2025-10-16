@@ -191,3 +191,21 @@ export interface QueueMetrics {
   total: number;
   last_scheduled_at?: string | null;
 }
+
+export interface DatabaseSummary {
+  task_counts: Record<string, number>;
+  worker_counts: Record<string, number>;
+  total_workers: number;
+  active_workers: number;
+}
+
+export interface SystemLogEntry {
+  id: number;
+  service: string;
+  level: string;
+  logger_name?: string | null;
+  message: string;
+  created_at?: string | null;
+  extra?: Record<string, unknown>;
+  traceback?: string | null;
+}

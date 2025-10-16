@@ -134,6 +134,7 @@ Scaling:
 - Heartbeats every 10s with payload `{ worker_id, partitions, lag, fetch_rate, errors_last_minute }`.
 - Scheduler writes metric records with queue depth.
 - Backend caches metrics in memory for quick retrieval.
+- Centralized `system_logs` table captures scheduler/worker/backend logs (query via `/api/system/logs`).
 - Consider integrating Prometheus (future).
 
 ### Control Plane Commands
