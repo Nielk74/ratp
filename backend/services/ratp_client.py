@@ -1,13 +1,16 @@
 """RATP API client for fetching real-time data."""
 
-import httpx
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone
 import asyncio
-import math
+import logging
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import httpx
+
 from ..config import settings
 from .cache_service import CacheService
 from .station_data import STATION_FALLBACKS
+from .scrapers.line_snapshot import line_snapshot_service
 from .scrapers.ratp_traffic import RatpTrafficScraper
 
 
@@ -20,9 +23,11 @@ class RatpClient:
     """Client for interacting with RATP sources (ratp.fr scraper and community API)."""
 
     def __init__(self):
+        self._logger = logging.getLogger(__name__)
         self.community_url = settings.community_api_url
         self.cache = CacheService()
         self._traffic_scraper = RatpTrafficScraper()
+        self._line_snapshot_service = line_snapshot_service
 
         self._line_catalog: List[Dict[str, Any]] = [
             # Metro lines
@@ -381,7 +386,37 @@ class RatpClient:
                 .get(code_normalised, [])
             )
 
-        trains = self._simulate_trains(line_info, stations)
+        trains: List[Dict[str, Any]] = []
+        snapshot_details: Optional[Dict[str, Any]] = None
+
+        if (
+            self._line_snapshot_service
+            and transport_type in {"metro", "rer", "tram", "transilien"}
+        ):
+            try:
+                snapshot_details = await asyncio.to_thread(
+                    self._line_snapshot_service.get_snapshot,
+                    transport_type,
+                    line_code,
+                    False,
+                    None,
+                )
+            except Exception as exc:  # pylint: disable=broad-except
+                self._logger.debug(
+                    "Snapshot fetch failed for %s %s: %s",
+                    transport_type,
+                    line_code,
+                    exc,
+                    exc_info=True,
+                )
+            else:
+                trains = [
+                    {**train, "direction": direction}
+                    for direction, direction_trains in (snapshot_details.get("trains") or {}).items()
+                    for train in direction_trains
+                ]
+                if not stations:
+                    stations = self._extract_stations_from_snapshot(snapshot_details)
 
         payload = {
             "line": line_info,
@@ -391,79 +426,31 @@ class RatpClient:
             "trains": trains,
         }
 
+        if snapshot_details:
+            payload["snapshot_refreshed_at"] = snapshot_details.get("scraped_at")
+
         await self.cache.set(cache_key, payload, ttl=3600)
         return payload
 
-    def _simulate_trains(
-        self,
-        line_info: Dict[str, Any],
-        stations: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
-        """Generate synthetic train positions along the line based on station coordinates."""
-        if len(stations) < 2:
-            return []
+    @staticmethod
+    def _extract_stations_from_snapshot(snapshot: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Reduce snapshot station entries (per direction) into a de-duplicated station list."""
+        stations: List[Dict[str, Any]] = []
+        seen: set[str] = set()
 
-        # Filter stations with coordinates
-        coords: List[Dict[str, Any]] = [
-            station for station in stations if station.get("latitude") and station.get("longitude")
-        ]
-        if len(coords) < 2:
-            return []
+        for entry in snapshot.get("stations", []):
+            name = entry.get("name")
+            slug = entry.get("slug")
+            key = (name or slug or "").strip().lower()
+            if not key or key in seen:
+                continue
+            seen.add(key)
 
-        headway_seconds = 180  # 3 minutes between trains
-        dwell_seconds = 90     # dwell at terminus
-        segment_time = 90      # travel time per segment
-        total_segments = len(coords) - 1
-        trip_duration = total_segments * segment_time
-        cycle_duration = trip_duration + dwell_seconds
-        trains_per_direction = max(2, math.ceil(trip_duration / headway_seconds))
+            metadata = entry.get("metadata") or {}
+            station_info: Dict[str, Any] = {"name": name, "slug": slug}
+            for field in ("latitude", "longitude", "city"):
+                if metadata.get(field) is not None:
+                    station_info[field] = metadata[field]
+            stations.append(station_info)
 
-        now = datetime.now(timezone.utc)
-        seconds_since_midnight = now.hour * 3600 + now.minute * 60 + now.second
-
-        trains: List[Dict[str, Any]] = []
-
-        def interpolate(start: Dict[str, Any], end: Dict[str, Any], progress: float) -> Dict[str, float]:
-            lat1 = float(start["latitude"])
-            lon1 = float(start["longitude"])
-            lat2 = float(end["latitude"])
-            lon2 = float(end["longitude"])
-            return {
-                "latitude": lat1 + (lat2 - lat1) * progress,
-                "longitude": lon1 + (lon2 - lon1) * progress,
-            }
-
-        def simulate_direction(
-            station_sequence: List[Dict[str, Any]],
-            direction: int,
-        ) -> None:
-            nonlocal trains
-            for idx in range(trains_per_direction):
-                offset = idx * headway_seconds
-                position_time = (seconds_since_midnight - offset) % cycle_duration
-                if position_time >= trip_duration:
-                    continue  # currently dwelling at terminus
-
-                segment_index = int(position_time // segment_time)
-                in_segment = (position_time % segment_time) / segment_time
-
-                start_station = station_sequence[segment_index]
-                end_station = station_sequence[segment_index + 1]
-
-                interpolated = interpolate(start_station, end_station, in_segment)
-
-                trains.append({
-                    "train_id": f"{line_info['code']}-{direction}-{idx}",
-                    "line_code": line_info["code"],
-                    "direction": direction,
-                    "position": interpolated,
-                    "from_station": start_station.get("name"),
-                    "to_station": end_station.get("name"),
-                    "progress": round(in_segment, 3),
-                    "updated_at": now.isoformat() + "Z",
-                })
-
-        simulate_direction(coords, 1)
-        simulate_direction(list(reversed(coords)), -1)
-
-        return trains
+        return stations

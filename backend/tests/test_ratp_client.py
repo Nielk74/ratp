@@ -47,6 +47,7 @@ async def test_get_lines_transilien(traffic_scraper_stub):
 async def test_get_line_details(mock_stations, traffic_scraper_stub):
     """Test retrieving detailed line information."""
     client = RatpClient()
+    client._line_snapshot_service = None
 
     details = await client.get_line_details("metro", "1")
 
