@@ -1,0 +1,772 @@
+openapi: "3.0.3"
+info:
+  title: "Bonjour RATP BFF API"
+  description: |
+    Backend-for-Frontend API powering the bonjour-ratp.fr transit information service.
+    Provides journey planning, real-time departures, line disruptions, mobility providers,
+    and regional transit maps for the Ile-de-France region.
+
+    Generated from automated reverse-engineering of the website on 2026-04-19.
+
+    **Note:** All endpoints require the `x-api-key` header. The API uses Kong 3.9.0
+    as a gateway behind Cloudflare CDN. Direct curl/HTTP requests are blocked by Cloudflare WAF;
+    use a real browser or simulate browser headers.
+
+    API versioning is content-type based via vendor-specific Accept headers
+    (e.g., `application/vnd.rss.bff.itinerary-stream.v9+json`), not URL-based.
+  version: "9.11.0"
+  contact:
+    name: "Bonjour RATP"
+    url: "https://www.bonjour-ratp.fr"
+  license:
+    name: "Unofficial reverse-engineered spec"
+    url: "https://github.com/anomalyco/opencode"
+
+servers:
+  - url: "https://bff.bonjour-ratp.fr"
+    description: "Production BFF API"
+
+tags:
+  - name: itineraries
+    description: "Journey planning and route search"
+  - name: "next-stops"
+    description: "Real-time departure information"
+  - name: lines
+    description: "Line information, disruptions, and timetables"
+  - name: maps
+    description: "Regional transit maps and geography"
+  - name: providers
+    description: "Mobility service providers (bike share, scooters)"
+  - name: problems
+    description: "Error responses (RFC 7807 ProblemDetails format)"
+
+# ============================================================
+# PATHS
+# ============================================================
+paths:
+  /itineraries/stream:
+    post:
+      tags:
+        - itineraries
+      summary: "Search for transit itineraries"
+      description: |
+        Returns step-by-step journey itineraries as Server-Sent Events (SSE).
+        The response is NOT compressed (content-encoding: identity) and contains
+        encoded polyline geometry for route visualization.
+
+        Response format: `text/event-stream` with JSON data events.
+        Each event contains metadata and an array of itineraries.
+      operationId: "postItinerariesStream"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ItineraryRequest"
+      responses:
+        "200":
+          description: "SSE stream with itinerary results"
+          headers:
+            x-api-version:
+              $ref: "#/components/headers/ApiVersion"
+            x-correlation-id:
+              $ref: "#/components/headers/CorrelationId"
+            x-kong-request-id:
+              $ref: "#/components/headers/KongRequestId"
+          content:
+            text/event-stream:
+              schema:
+                type: "string"
+                description: "Server-Sent Events stream"
+                example: |
+                  id:528d935c-bd1f-4058-8572-d2cdb50f9218
+                  event:data
+                  data:{"metadata":{"uuid":"9eed4d1ab81cd114-CDG","sections":[...],...},"itineraries":[...]}
+        "400":
+          description: "Bad request — invalid payload"
+          content:
+            application/vnd.rss.bff.problem.v1+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "401":
+          description: "Unauthorized — invalid or missing API key"
+          content:
+            application/vnd.rss.bff.problem.v1+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "429":
+          description: "Rate limited"
+          content:
+            application/vnd.rss.bff.problem.v1+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /next-stops/preview/batch:
+    post:
+      tags:
+        - "next-stops"
+      summary: "Get real-time next departures (batch)"
+      description: |
+        Returns real-time next departures for multiple transit queries in a single request.
+        The transitId parameter is a Base64-encoded JSON object containing
+        lineId, directionId, stopAreaId, and stopPlaceId.
+      operationId: "postNextStopsPreviewBatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NextStopsBatchRequest"
+      responses:
+        "200":
+          description: "Batch of real-time next stop predictions"
+          headers:
+            x-api-version:
+              $ref: "#/components/headers/ApiVersion"
+            x-correlation-id:
+              $ref: "#/components/headers/CorrelationId"
+          content:
+            application/vnd.rss.bff.next-stop-preview-batch.v1+json:
+              schema:
+                $ref: "#/components/schemas/NextStopsBatchResponse"
+        "400":
+          description: "Bad request"
+          content:
+            application/vnd.rss.bff.problem.v1+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /lines/situations:
+    get:
+      tags:
+        - lines
+      summary: "Get current line disruptions/situations"
+      description: |
+        Returns current disruption and crisis situations for transit lines.
+        If `lineId` is empty or omitted, returns situations for ALL lines.
+      operationId: "getLinesSituations"
+      parameters:
+        - name: "lineId"
+          in: "query"
+          description: |
+            Filter by line ID. Empty string returns all lines.
+            Format: `LIG:IDFM:{code}` (e.g., `LIG:IDFM:C01742` for RER A).
+          required: false
+          schema:
+            type: "string"
+            example: ""
+      responses:
+        "200":
+          description: "Array of line situation objects"
+          headers:
+            x-api-version:
+              $ref: "#/components/headers/ApiVersion"
+            x-correlation-id:
+              $ref: "#/components/headers/CorrelationId"
+          content:
+            application/vnd.rss.bff.lines-situations.v5+json:
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/components/schemas/LineSituation"
+              example:
+                - line:
+                    id: "LIG:IDFM:C01742"
+                    labels:
+                      displayName: "Boissy-Saint-Léger • Marne-la-Vallée Chessy / Cergy le Haut • Poissy • Saint-Germain-en-Laye"
+                      accessibilityName: "RER A"
+                    displayNamesByWay:
+                      - "Boissy-Saint-Léger • Marne-la-Vallée Chessy"
+                      - "Cergy le Haut • Poissy • Saint-Germain-en-Laye"
+                    displayCode: "A"
+                    color:
+                      background: "#FF1400"
+                      font: "#FFFFFF"
+                    businessMode: "RER"
+                    assets:
+                      icon:
+                        svg: "https://assets-bff.bonjour-ratp.fr/pictograms/svg/LIG:IDFM:C01742.svg"
+                        png: "https://assets-bff.bonjour-ratp.fr/pictograms/png/LIG:IDFM:C01742@3x.png"
+                        name: "LIG:IDFM:C01742"
+                    operatorName: "SNCF"
+                  pictoType: "critical"
+                  outlineColor: "#E32826"
+                  outlineWidth: 4
+                  criticity: "HIGH"
+                  trackingSituation: "STOPPED"
+        "400":
+          description: "Bad request"
+          content:
+            application/vnd.rss.bff.problem.v1+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /itineraries/providers:
+    get:
+      tags:
+        - providers
+      summary: "Get mobility service providers"
+      description: |
+        Returns available mobility providers for first/last mile connections:
+        e-scooters (Dott, Lime), bike share (Vélib'), etc.
+      operationId: "getItinerariesProviders"
+      responses:
+        "200":
+          description: "Array of mobility provider objects"
+          content:
+            application/vnd.rss.bff.itineraries-providers.v1+json:
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/components/schemas/Provider"
+              example:
+                - id: "DOTT"
+                  name: "DOTT"
+                  color: "#00A8E9"
+                  assets:
+                    icon:
+                      name: "icon-provider-DOTT"
+                      svg: "https://assets-b2c.bonjour-ratp.fr/public/icon_dott.svg"
+                      png: "https://assets-b2c.bonjour-ratp.fr/public/icon_dott.png"
+                    logo:
+                      name: "logo-provider-DOTT"
+                      svg: "https://assets-b2c.bonjour-ratp.fr/public/logo_dott.svg"
+                      png: "https://assets-b2c.bonjour-ratp.fr/public/logo_dott.png"
+                    pictoSausage:
+                      name: "pictoSausage-provider-DOTT"
+                      svg: "https://assets-b2c.bonjour-ratp.fr/public/logo_full_name_dott.svg"
+                      png: "https://assets-b2c.bonjour-ratp.fr/public/logo_full_name_dott.png"
+                - id: "LIME"
+                  name: "LIME"
+                  color: "#00DD00"
+                - id: "VELIB_METROPOLE"
+                  name: "VÉLIB' Métropole"
+                  color: "#2484FD"
+        "400":
+          description: "Bad request"
+          content:
+            application/vnd.rss.bff.problem.v1+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /maps:
+    get:
+      tags:
+        - maps
+      summary: "Get regional transit maps"
+      description: |
+        Returns available regional transit maps in various formats (PDF, PNG, WebP).
+        The `bbox` parameter filters maps relevant to a geographic area.
+      operationId: "getMaps"
+      parameters:
+        - name: "bbox"
+          in: "query"
+          description: |
+            Bounding box in format: `minLon,minLat,maxLon,maxLat`.
+            Example for Ile-de-France: `2.0,48.7,2.5,49.0`
+          required: true
+          schema:
+            type: "string"
+            example: "2.0,48.7,2.5,49.0"
+      responses:
+        "200":
+          description: "Array of regional transit map objects"
+          content:
+            application/vnd.rss.bff.maps.v3+json:
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/components/schemas/Map"
+              example:
+                - id: "pmx27jr4ajcy8x8uokep9jtd"
+                  displayName: "Plan du réseau régional des transports"
+                  accessibilityName: "Plan du réseau régional des transports"
+                  shortName: "Train et Métro"
+                  type: "REGIONAL"
+                  url:
+                    id: "PLAN_REGION_2025-12_06-12-2025.pdf"
+                    pdfLink: "https://assets-web.bonjour-ratp.fr/PLAN_REGION_2025_12_06_12_2025_adee59ba82.pdf"
+                    pngLink: "https://assets-web.bonjour-ratp.fr/PLAN_REGION_2025_12_06_12_2025_a6811a08e0.png"
+                    webpLink: "https://assets-web.bonjour-ratp.fr/PLAN_REGION_2025_12_06_12_2025_615ba0f39c.webp"
+                - id: "w1blzxum9j94m1y5ldm9hrn0"
+                  displayName: "Plan pour voyageur en fauteuil roulant"
+                  shortName: "Plan pour voyageur en fauteuil roulant"
+                  type: "EVENT"
+                  url:
+                    pdfLink: "https://assets-web.bonjour-ratp.fr/Plan_UFR_2023_9caf5f2a9c_87689de87a.pdf"
+                    pngLink: "https://assets-web.bonjour-ratp.fr/Plan_UFR_2023_9caf5f2a9c_952d94d4d8.png"
+                    webpLink: "https://assets-web.bonjour-ratp.fr/Plan_UFR_2023_9caf5f2a9c_29f9b4e18b.webp"
+                  picto:
+                    png: "https://assets-web.bonjour-ratp.fr/logo_bonjour_6929747e35.png"
+                    svg: "https://assets-web.bonjour-ratp.fr/logo_bonjour_9114245fb7.svg"
+                    name: "logo-bonjour.png"
+        "400":
+          description: "Bad request"
+          content:
+            application/vnd.rss.bff.problem.v1+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+# ============================================================
+# COMPONENTS
+# ============================================================
+components:
+  # ---------- Request Bodies ----------
+  schemas:
+    ItineraryRequest:
+      type: "object"
+      required:
+        - origin
+        - destination
+        - transportModes
+      properties:
+        origin:
+          $ref: "#/components/schemas/Location"
+          description: "Starting point coordinates"
+        destination:
+          $ref: "#/components/schemas/Location"
+          description: "Ending point coordinates"
+        withReducedMobility:
+          type: "boolean"
+          default: false
+          description: "Whether to optimize for reduced mobility access"
+        excludedLinesIds:
+          type: "array"
+          items:
+            type: "string"
+            description: "Line IDs to exclude from results"
+            example: "LIG:IDFM:C01742"
+          default: []
+        excludedStationsIds:
+          type: "array"
+          items:
+            type: "string"
+            example: "ART:IDFM:43184"
+          default: []
+        transportModes:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/TransportMode"
+          description: "Allowed transport modes for the search"
+      example:
+        origin:
+          latitude: 48.88327
+          longitude: 2.23349
+        destination:
+          latitude: 48.80604
+          longitude: 2.15266
+        withReducedMobility: false
+        excludedLinesIds: []
+        excludedStationsIds: []
+        transportModes:
+          - RER
+          - TRANSILIEN
+          - METRO
+          - BUS
+          - TRAM
+          - CABLE
+          - BICYCLE
+          - SELF_SERVICE_VEHICLE
+          - WALK
+
+    Location:
+      type: "object"
+      required:
+        - latitude
+        - longitude
+      properties:
+        latitude:
+          type: "number"
+          format: "double"
+          minimum: -90
+          maximum: 90
+          description: "WGS84 latitude"
+        longitude:
+          type: "number"
+          format: "double"
+          minimum: -180
+          maximum: 180
+          description: "WGS84 longitude"
+      example:
+        latitude: 48.8566
+        longitude: 2.3522
+
+    NextStopsBatchRequest:
+      type: "object"
+      required:
+        - requests
+      properties:
+        requests:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/NextStopsRequest"
+      example:
+        requests:
+          - transitId: "eyJsaW5lSWQiOiJMSUc6SURGTTpDMDE3NDAiLCJkaXJlY3Rpb25JZCI6IkRJUjpJREZNOkMwMTc0MDpBIiwic3RvcEFyZWFJZCI6IkxEQTpJREZNOjcxNDIyIiwic3RvcFBsYWNlSWQiOiJBUlQ6SURGTTo0MzE4NCJ9"
+            startDate: "2026-04-19T16:34:43.000Z"
+
+    NextStopsRequest:
+      type: "object"
+      required:
+        - transitId
+        - startDate
+      properties:
+        transitId:
+          type: "string"
+          format: "base64"
+          description: |
+            Base64-encoded JSON containing lineId, directionId, stopAreaId, stopPlaceId.
+            To construct: encode JSON {"lineId":"...", "directionId":"...", "stopAreaId":"...", "stopPlaceId":"..."} to base64.
+            Example decoded: {"lineId":"LIG:IDFM:C01740","directionId":"DIR:IDFM:C01740:A","stopAreaId":"LDA:IDFM:71422","stopPlaceId":"ART:IDFM:43184"}
+          example: "eyJsaW5lSWQiOiJMSUc6SURGTTpDMDE3NDAiLCJkaXJlY3Rpb25JZCI6IkRJUjpJREZNOkMwMTc0MDpBIiwic3RvcEFyZWFJZCI6IkxEQTpJREZNOjcxNDIyIiwic3RvcFBsYWNlSWQiOiJBUlQ6SURGTTo0MzE4NCJ9"
+        startDate:
+          type: "string"
+          format: "date-time"
+          description: "Query timestamp in ISO 8601 format"
+          example: "2026-04-19T16:34:43.000Z"
+
+    NextStopsBatchResponse:
+      type: "object"
+      properties:
+        transitsNextStops:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/TransitNextStops"
+      example:
+        transitsNextStops:
+          - transitId: "eyJsaW5lSWQiOiJMSUc6SURGTTpDMDE3NDAi..."
+            realTimeNextStops:
+              - destinationName:
+                  displayName: "Gare de Versailles - Rive Droite"
+                  accessibilityName: "Gare de Versailles - Rive Droite"
+                status: "AVAILABLE_WAITING_TIME"
+                servicePatternName: "VOLA"
+                waitingTimeInMinutes: 5
+                dateTime: "2026-04-19T16:36:44.401Z"
+              - destinationName:
+                  displayName: "Gare de Versailles - Rive Droite"
+                status: "AVAILABLE_WAITING_TIME"
+                waitingTimeInMinutes: 20
+                dateTime: "2026-04-19T16:51:44.401Z"
+            theoreticalNextStops: []
+
+    TransitNextStops:
+      type: "object"
+      properties:
+        transitId:
+          type: "string"
+        realTimeNextStops:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/RealTimeStop"
+        theoreticalNextStops:
+          type: "array"
+          items:
+            type: "object"
+
+    RealTimeStop:
+      type: "object"
+      properties:
+        destinationName:
+          $ref: "#/components/schemas/DisplayName"
+        status:
+          type: "string"
+          enum:
+            - AVAILABLE_WAITING_TIME
+          description: "Real-time data status"
+        servicePatternName:
+          type: "string"
+          description: "Service name/pattern (e.g., 'VOLA')"
+        waitingTimeInMinutes:
+          type: "integer"
+          description: "Minutes until departure"
+        dateTime:
+          type: "string"
+          format: "date-time"
+
+    LineSituation:
+      type: "object"
+      description: "Current disruption/crisis status for a transit line"
+      properties:
+        line:
+          type: "object"
+          properties:
+            id:
+              type: "string"
+              description: "Line ID (LIG:IDFM:xxx)"
+            labels:
+              type: "object"
+              properties:
+                displayName:
+                  type: "string"
+                  description: "Full route name"
+                accessibilityName:
+                  type: "string"
+                  description: "Short name (e.g., 'RER A')"
+            displayNamesByWay:
+              type: "array"
+              items:
+                type: "string"
+              description: "Direction names (to/from)"
+            displayCode:
+              type: "string"
+              description: "Line letter/number (e.g., 'A', 'B')"
+            color:
+              type: "object"
+              properties:
+                background:
+                  type: "string"
+                  format: "color"
+                font:
+                  type: "string"
+                  format: "color"
+            businessMode:
+              type: "string"
+              description: "Transport mode (RER, METRO, BUS, etc.)"
+            assets:
+              type: "object"
+              properties:
+                icon:
+                  type: "object"
+                  properties:
+                    svg:
+                      type: "string"
+                      format: "uri"
+                    png:
+                      type: "string"
+                      format: "uri"
+                    name:
+                      type: "string"
+            operatorName:
+              type: "string"
+              description: "Operating company (SNCF, RATP, etc.)"
+        pictoType:
+          type: "string"
+          description: "Crisis pictogram type"
+        outlineColor:
+          type: "string"
+          format: "color"
+        outlineWidth:
+          type: "integer"
+        criticity:
+          type: "string"
+          enum:
+            - HIGH
+            - MEDIUM
+            - LOW
+        trackingSituation:
+          type: "string"
+          description: "Current disruption status"
+      example:
+        line:
+          id: "LIG:IDFM:C01742"
+          labels:
+            displayName: "RER A"
+            accessibilityName: "RER A"
+          displayCode: "A"
+          color:
+            background: "#FF1400"
+            font: "#FFFFFF"
+          businessMode: "RER"
+          operatorName: "SNCF"
+        criticity: "HIGH"
+        trackingSituation: "STOPPED"
+
+    Provider:
+      type: "object"
+      description: "Mobility service provider"
+      properties:
+        id:
+          type: "string"
+          description: "Provider identifier"
+        name:
+          type: "string"
+          description: "Display name"
+        color:
+          type: "string"
+          format: "color"
+          description: "Brand color hex"
+        assets:
+          type: "object"
+          properties:
+            icon:
+              type: "object"
+              properties:
+                name:
+                  type: "string"
+                svg:
+                  type: "string"
+                  format: "uri"
+                png:
+                  type: "string"
+                  format: "uri"
+            logo:
+              type: "object"
+              properties:
+                name:
+                  type: "string"
+                svg:
+                  type: "string"
+                  format: "uri"
+                png:
+                  type: "string"
+                  format: "uri"
+            pictoSausage:
+              type: "object"
+              properties:
+                name:
+                  type: "string"
+                svg:
+                  type: "string"
+                  format: "uri"
+                png:
+                  type: "string"
+                  format: "uri"
+      example:
+        id: "DOTT"
+        name: "DOTT"
+        color: "#00A8E9"
+        assets:
+          icon:
+            name: "icon-provider-DOTT"
+            svg: "https://assets-b2c.bonjour-ratp.fr/public/icon_dott.svg"
+            png: "https://assets-b2c.bonjour-ratp.fr/public/icon_dott.png"
+
+    Map:
+      type: "object"
+      description: "Regional transit map"
+      properties:
+        id:
+          type: "string"
+        displayName:
+          type: "string"
+        accessibilityName:
+          type: "string"
+        shortName:
+          type: "string"
+        type:
+          type: "string"
+          enum:
+            - REGIONAL
+            - EVENT
+        url:
+          type: "object"
+          properties:
+            id:
+              type: "string"
+            pdfLink:
+              type: "string"
+              format: "uri"
+            pngLink:
+              type: "string"
+              format: "uri"
+            webpLink:
+              type: "string"
+              format: "uri"
+        picto:
+          type: "object"
+          properties:
+            png:
+              type: "string"
+              format: "uri"
+            svg:
+              type: "string"
+              format: "uri"
+            name:
+              type: "string"
+      example:
+        id: "pmx27jr4ajcy8x8uokep9jtd"
+        displayName: "Plan du réseau régional des transports"
+        shortName: "Train et Métro"
+        type: "REGIONAL"
+        url:
+          pdfLink: "https://assets-web.bonjour-ratp.fr/PLAN_REGION_2025_12_06_12_2025_adee59ba82.pdf"
+          pngLink: "https://assets-web.bonjour-ratp.fr/PLAN_REGION_2025_12_06_12_2025_a6811a08e0.png"
+          webpLink: "https://assets-web.bonjour-ratp.fr/PLAN_REGION_2025_12_06_12_2025_615ba0f39c.webp"
+
+    DisplayName:
+      type: "object"
+      properties:
+        displayName:
+          type: "string"
+        accessibilityName:
+          type: "string"
+
+    ProblemDetails:
+      type: "object"
+      description: "RFC 7807 ProblemDetails format"
+      required:
+        - statusCode
+        - error
+        - message
+      properties:
+        statusCode:
+          type: "integer"
+          description: "HTTP status code"
+        error:
+          type: "string"
+          description: "Error type summary"
+        message:
+          type: "string"
+          description: "Detailed error message"
+      example:
+        statusCode: 400
+        error: "Bad Request"
+        message: "Invalid request payload input."
+
+    TransportMode:
+      type: "string"
+      enum:
+        - RER
+        - TRANSILIEN
+        - METRO
+        - BUS
+        - TRAM
+        - CABLE
+        - BICYCLE
+        - SELF_SERVICE_VEHICLE
+        - WALK
+      description: |
+        Supported transport mode identifiers.
+        - RER: Regional express network
+        - TRANSILIEN: SNCF suburban rails
+        - METRO: Metro
+        - BUS: Bus
+        - TRAM: Tramway
+        - CABLE: Cable car (Montmartre Funicular)
+        - BICYCLE: Bicycle
+        - SELF_SERVICE_VEHICLE: Vélib', Dott, Lime scooters
+        - WALK: Walking
+
+  # ---------- Security Schemes ----------
+  securitySchemes:
+    ApiKeyHeader:
+      type: "apiKey"
+      in: "header"
+      name: "x-api-key"
+      description: "API key (embedded in website JS)"
+
+  # ---------- Response Headers ----------
+  headers:
+    ApiVersion:
+      description: "API version number"
+      schema:
+        type: "integer"
+        example: 9
+    CorrelationId:
+      description: "Request tracing ID (format: hex-timestamp-region)"
+      schema:
+        type: "string"
+        example: "9eed4d1ab81cd114-CDG"
+    KongRequestId:
+      description: "Kong gateway unique request ID"
+      schema:
+        type: "string"
+        format: "uuid"
+        example: "e3594c4fbd31744a61d9286d6bbf646f"
+
+# ============================================================
+# SECURITY REQUIREMENTS
+# ============================================================
+security:
+  - ApiKeyHeader: []

@@ -1,0 +1,12 @@
+node_modules/
+captured-bundles.json
+full-api-results.json
+api-calls.json
+api-findings.json
+api-keys.json
+api-summary.json
+*.log
+.env
+find-key.js
+find-config.js
+extract-keys.js
