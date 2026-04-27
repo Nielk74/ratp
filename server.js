@@ -191,7 +191,7 @@ const server = http.createServer(async (req, res) => {
     return res.end(JSON.stringify({ status: 'ok', keyPrefix: cfg.bffExternalApiKey.substring(0, 8) + '...' }));
   }
 
-  if (pathname === '/' || pathname === '/index.html') {
+  if (pathname === '/scalar' || pathname === '/scalar/') {
     try {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(buildHtml());
@@ -201,7 +201,26 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  res.writeHead(404); res.end('Not found');
+  // Serve frontend static files
+  const FRONTEND_DIR = path.join(__dirname, 'frontend');
+  const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'application/javascript' };
+  let filePath;
+  if (pathname === '/' || pathname === '/index.html') {
+    filePath = path.join(FRONTEND_DIR, 'index.html');
+  } else {
+    const rel = pathname.replace(/^\//, '');
+    filePath = path.join(FRONTEND_DIR, rel);
+    // Prevent directory traversal
+    if (!filePath.startsWith(FRONTEND_DIR)) { res.writeHead(403); return res.end('Forbidden'); }
+  }
+  try {
+    const content = fs.readFileSync(filePath);
+    const ext = path.extname(filePath);
+    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+    return res.end(content);
+  } catch {
+    res.writeHead(404); return res.end('Not found');
+  }
 });
 
 async function gracefulShutdown(signal) {
@@ -246,7 +265,8 @@ async function startup() {
     console.log(`    GET  /v1/departures?line=RER+A&stop=Gare+du+Nord`);
     console.log(`    GET  /v1/providers`);
     console.log(`    GET  /v1/maps`);
-    console.log(`\n  Scalar UI:   http://localhost:${PORT}/`);
+    console.log(`\n  Frontend:    http://localhost:${PORT}/`);
+    console.log(`  Scalar UI:   http://localhost:${PORT}/scalar`);
     console.log(`  Raw proxy:   http://localhost:${PORT}/api/proxy?url=...\n`);
   });
 }

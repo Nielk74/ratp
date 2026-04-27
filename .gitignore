@@ -10,3 +10,6 @@ api-summary.json
 find-key.js
 find-config.js
 extract-keys.js
+tests/playwright/.server.pid
+test-results/
+playwright-report/

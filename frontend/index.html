@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RATP — Transports Paris</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="logo">
+        <span class="logo-icon">🚇</span>
+        <span class="logo-text">RATP</span>
+      </div>
+      <nav class="nav">
+        <button class="nav-item active" data-tab="departures">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>Départs</span>
+        </button>
+        <button class="nav-item" data-tab="incidents">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span>Perturbations</span>
+        </button>
+        <button class="nav-item" data-tab="itinerary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"/><line x1="12" y1="22" x2="12" y2="8"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/></svg>
+          <span>Itinéraire</span>
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="status-dot" id="status-dot"></div>
+        <span class="status-text" id="status-text">Connexion…</span>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main">
+      <!-- Departures tab -->
+      <section class="tab active" id="tab-departures">
+        <div class="tab-header">
+          <h1>Prochains départs</h1>
+          <p class="subtitle">Horaires en temps réel</p>
+        </div>
+        <form class="search-form" id="departures-form">
+          <div class="field-group">
+            <div class="field">
+              <label>Ligne</label>
+              <input type="text" id="dep-line" placeholder="ex: metro 4, rer a, bus 21" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label>Arrêt</label>
+              <input type="text" id="dep-stop" placeholder="ex: Montparnasse" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label>Direction <span class="optional">(optionnel)</span></label>
+              <input type="text" id="dep-direction" placeholder="ex: Montrouge" autocomplete="off" />
+            </div>
+          </div>
+          <button type="submit" class="btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Rechercher
+          </button>
+        </form>
+        <div class="results" id="departures-results"></div>
+      </section>
+
+      <!-- Incidents tab -->
+      <section class="tab" id="tab-incidents">
+        <div class="tab-header">
+          <h1>Perturbations</h1>
+          <p class="subtitle">État du réseau en direct</p>
+        </div>
+        <form class="search-form" id="incidents-form">
+          <div class="field-group">
+            <div class="field">
+              <label>Ligne <span class="optional">(optionnel)</span></label>
+              <input type="text" id="inc-line" placeholder="ex: rer b, metro 13" autocomplete="off" />
+            </div>
+          </div>
+          <button type="submit" class="btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Voir les perturbations
+          </button>
+        </form>
+        <div class="results" id="incidents-results"></div>
+      </section>
+
+      <!-- Itinerary tab -->
+      <section class="tab" id="tab-itinerary">
+        <div class="tab-header">
+          <h1>Calculer un itinéraire</h1>
+          <p class="subtitle">Porte à porte en transports</p>
+        </div>
+        <form class="search-form" id="itinerary-form">
+          <div class="field-group">
+            <div class="field field-wide">
+              <label>Départ</label>
+              <input type="text" id="itin-from" placeholder="ex: 10 rue de Rivoli, Paris" autocomplete="off" />
+            </div>
+            <div class="field field-wide">
+              <label>Arrivée</label>
+              <input type="text" id="itin-to" placeholder="ex: Tour Eiffel, Paris" autocomplete="off" />
+            </div>
+          </div>
+          <button type="submit" class="btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            Calculer
+          </button>
+        </form>
+        <div class="results" id="itinerary-results"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
